@@ -1,6 +1,16 @@
-# Tauri + Vue + TypeScript
+# midirc
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+Transform your digital instrument experience. With midirc, a powerful Tauri and Rust desktop application, empowering you to connect, record, play back, and interact with your digital piano or any MIDI instrument. Unlock new creative possibilities and enhance your musical journey.
+
+## Roadmap
+
+- [ ] Setup instrument connection (input/output)
+- [ ] MIDI Recorder
+- [ ] MIDI Player (playback)
+- [ ] Save/Load Standard MIDI Files (SMF)
+- [ ] Interactive Learning Mode (Real-time Feedback & Progression)
+  - [ ] Built-in Lessons (e.g. chords, public domain beginner pieces)
+- [ ] MIDI Editor (edit and create interactive content)
 
 ## Recommended IDE Setup
 
@@ -14,3 +24,14 @@ Since TypeScript cannot handle type information for `.vue` imports, they are shi
 2. Reload the VS Code window by running `Developer: Reload Window` from the command palette.
 
 You can learn more about Take Over mode [here](https://github.com/johnsoncodehk/volar/discussions/471).
+
+## Resources
+
+### MIDI Specifications
+
+- [https://midi.org/specs](https://midi.org/specs)
+
+### MIDI rust lib
+
+- [https://docs.rs/midir/latest/midir/index.html](https://docs.rs/midir/latest/midir/index.html)
+- [https://github.com/Boddlnagg/midir/tree/master/examples](https://github.com/Boddlnagg/midir/tree/master/examples)
