@@ -35,3 +35,15 @@ You can learn more about Take Over mode [here](https://github.com/johnsoncodehk/
 
 - [https://docs.rs/midir/latest/midir/index.html](https://docs.rs/midir/latest/midir/index.html)
 - [https://github.com/Boddlnagg/midir/tree/master/examples](https://github.com/Boddlnagg/midir/tree/master/examples)
+
+### Tauri
+
+- [https://tauri.app/develop/](https://tauri.app/develop/)
+
+### Vue
+
+- [https://vuejs.org/guide/introduction.html](https://vuejs.org/guide/introduction.html)
+
+### Google Fonts (Icons)
+
+- [https://fonts.google.com/icons](https://fonts.google.com/icons)
