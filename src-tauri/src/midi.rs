@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::{fmt::Debug, sync::Mutex};
 
 use midir::MidiInput;
 
@@ -20,14 +20,44 @@ pub struct MidiOutputPort {
 
 #[derive(Default, Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct MidiInputConnection {
+    pub port: MidiInputPort,
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MidiStateInner {
-    input: Vec<MidiInputPort>,
-    output: Vec<MidiOutputPort>,
+    available_input_ports: Vec<MidiInputPort>,
+    available_output_ports: Vec<MidiOutputPort>,
+    #[serde(skip)]
+    _input_connection: Option<midir::MidiInputConnection<()>>,
+    input_connection: Option<MidiInputConnection>,
+}
+
+impl Debug for MidiStateInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MidiStateInner")
+            .field("available_input_ports", &self.available_input_ports)
+            .field("available_output_ports", &self.available_output_ports)
+            .field("input_connection", &self.input_connection)
+            .finish()
+    }
+}
+
+impl Clone for MidiStateInner {
+    fn clone(&self) -> Self {
+        MidiStateInner {
+            available_input_ports: self.available_input_ports.clone(),
+            available_output_ports: self.available_output_ports.clone(),
+            _input_connection: None,
+            input_connection: self.input_connection.clone(),
+        }
+    }
 }
 
 impl MidiStateInner {
     pub fn scan_input(&mut self) -> Result<(), String> {
-        self.input.clear();
+        self.available_input_ports.clear();
 
         let input = MidiInput::new("midirc")
             .map_err(|e| format!("Failed to scan for input ports: {}", e))?;
@@ -37,7 +67,7 @@ impl MidiStateInner {
             let name = input.port_name(port);
 
             if let Ok(name) = name {
-                self.input.push(MidiInputPort { name, id });
+                self.available_input_ports.push(MidiInputPort { name, id });
             }
         }
 
@@ -45,7 +75,7 @@ impl MidiStateInner {
     }
 
     pub fn scan_output(&mut self) -> Result<(), String> {
-        self.output.clear();
+        self.available_output_ports.clear();
 
         let output = midir::MidiOutput::new("midirc")
             .map_err(|e| format!("Failed to scan for output ports: {}", e))?;
@@ -55,9 +85,53 @@ impl MidiStateInner {
             let name = output.port_name(port);
 
             if let Ok(name) = name {
-                self.output.push(MidiOutputPort { name, id });
+                self.available_output_ports
+                    .push(MidiOutputPort { name, id });
             }
         }
+
+        Ok(())
+    }
+
+    pub fn disconnect_input(&mut self) {
+        self.input_connection = None;
+        self._input_connection = None;
+    }
+
+    pub fn connect_input(&mut self, index: usize) -> Result<(), String> {
+        if self.input_connection.is_some() || self._input_connection.is_some() {
+            return Err("Input connection already exists. Disconnect first.".to_string());
+        }
+
+        let input = MidiInput::new("midirc")
+            .map_err(|e| format!("Failed to connect for input ports: {}", e))?;
+
+        let port = self.available_input_ports.get(index).ok_or_else(|| {
+            format!(
+                "Input port index out of bounds: {}. Available ports: {}",
+                index,
+                self.available_input_ports.len()
+            )
+        })?;
+        let midi_port = input.find_port_by_id(port.id.clone());
+        let midi_port =
+            midi_port.ok_or_else(|| format!("Input port not found: {}", port.name.as_str()))?;
+
+        let connection = input
+            .connect(
+                &midi_port,
+                port.name.as_str(),
+                |_, message, _| {
+                    println!("Received MIDI message: {:?}", message);
+                },
+                (),
+            )
+            .map_err(|e| format!("Failed to connect to input port: {}", e))?;
+
+        self._input_connection = Some(connection);
+        self.input_connection = Some(MidiInputConnection {
+            port: port.to_owned(),
+        });
 
         Ok(())
     }

@@ -2,7 +2,10 @@ import { ref } from "vue";
 import { Midi } from "../types/midi";
 import { scanMidi } from "../tauri/midi-commands";
 
-const defaultMidi = { input: [], output: [] } satisfies Midi;
+const defaultMidi = {
+  availableInputPorts: [],
+  availableOutputPorts: [],
+} satisfies Midi;
 const globalMidi = ref<Midi>(defaultMidi);
 
 function scan() {

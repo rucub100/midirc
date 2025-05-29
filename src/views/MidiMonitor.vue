@@ -22,14 +22,14 @@ function refresh() {
             <label class="mr-2">Input:</label>
             <select v-model="selectedInput">
                 <option value="">--Please select input--</option>
-                <template v-for="input in midi.input">
+                <template v-for="input in midi.availableInputPorts">
                     <option :value="input.id">{{ input.name }}</option>
                 </template>
             </select>
             <label class="mr-2">Output:</label>
             <select v-model="selectedOutput">
                 <option value="">--Please select output--</option>
-                <template v-for="output in midi.output">
+                <template v-for="output in midi.availableOutputPorts">
                     <option :value="output.id">{{ output.name }}</option>
                 </template>
             </select>

@@ -9,6 +9,6 @@ export type MidiOutputPort = {
 };
 
 export type Midi = {
-  input: MidiInputPort[];
-  output: MidiOutputPort[];
+  availableInputPorts: MidiInputPort[];
+  availableOutputPorts: MidiOutputPort[];
 };
