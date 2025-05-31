@@ -24,6 +24,12 @@ pub struct MidiInputConnection {
     pub port: MidiInputPort,
 }
 
+#[derive(Default, Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MidiOutputConnection {
+    pub port: MidiOutputPort,
+}
+
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MidiStateInner {
@@ -32,6 +38,9 @@ pub struct MidiStateInner {
     #[serde(skip)]
     _input_connection: Option<midir::MidiInputConnection<()>>,
     input_connection: Option<MidiInputConnection>,
+    #[serde(skip)]
+    _output_connection: Option<midir::MidiOutputConnection>,
+    output_connection: Option<MidiOutputConnection>,
 }
 
 impl Debug for MidiStateInner {
@@ -51,6 +60,8 @@ impl Clone for MidiStateInner {
             available_output_ports: self.available_output_ports.clone(),
             _input_connection: None,
             input_connection: self.input_connection.clone(),
+            _output_connection: None,
+            output_connection: self.output_connection.clone(),
         }
     }
 }
@@ -130,6 +141,42 @@ impl MidiStateInner {
 
         self._input_connection = Some(connection);
         self.input_connection = Some(MidiInputConnection {
+            port: port.to_owned(),
+        });
+
+        Ok(())
+    }
+
+    pub fn disconnect_output(&mut self) {
+        self.output_connection = None;
+        self._output_connection = None;
+    }
+
+    pub fn connect_output(&mut self, index: usize) -> Result<(), String> {
+        if self.output_connection.is_some() || self._output_connection.is_some() {
+            return Err("Output connection already exists. Disconnect first.".to_string());
+        }
+
+        let output = midir::MidiOutput::new("midirc")
+            .map_err(|e| format!("Failed to connect for output ports: {}", e))?;
+
+        let port = self.available_output_ports.get(index).ok_or_else(|| {
+            format!(
+                "Output port index out of bounds: {}. Available ports: {}",
+                index,
+                self.available_output_ports.len()
+            )
+        })?;
+        let midi_port = output.find_port_by_id(port.id.clone());
+        let midi_port =
+            midi_port.ok_or_else(|| format!("Output port not found: {}", port.name.as_str()))?;
+
+        let connection = output
+            .connect(&midi_port, port.name.as_str())
+            .map_err(|e| format!("Failed to connect to output port: {}", e))?;
+
+        self._output_connection = Some(connection);
+        self.output_connection = Some(MidiOutputConnection {
             port: port.to_owned(),
         });
 
