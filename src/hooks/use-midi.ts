@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { Midi } from "../types/midi";
-import { scanMidi } from "../tauri/midi-commands";
+import { connectMidi, disconnectMidi, scanMidi } from "../tauri/midi-commands";
 
 const defaultMidi = {
   availableInputPorts: [],
@@ -21,6 +21,30 @@ function scan() {
     });
 }
 
+function connect(inputId: string, outputId: string) {
+  connectMidi(inputId, outputId)
+    .then((midi) => {
+      console.log("MIDI devices connected:", midi);
+      globalMidi.value = midi;
+    })
+    .catch((error) => {
+      console.error("Error connecting MIDI devices:", error);
+      globalMidi.value = defaultMidi;
+    });
+}
+
+function disconnect() {
+  disconnectMidi()
+    .then((midi) => {
+      console.log("MIDI devices disconnected!");
+      globalMidi.value = midi;
+    })
+    .catch((error) => {
+      console.error("Error disconnecting MIDI devices:", error);
+      globalMidi.value = defaultMidi;
+    });
+}
+
 export function useMidi() {
-  return { midi: globalMidi, scan };
+  return { midi: globalMidi, scan, connect, disconnect };
 }

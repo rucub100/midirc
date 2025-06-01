@@ -11,4 +11,10 @@ export type MidiOutputPort = {
 export type Midi = {
   availableInputPorts: MidiInputPort[];
   availableOutputPorts: MidiOutputPort[];
+  inputConnection?: {
+    port: MidiInputPort;
+  };
+  outputConnection?: {
+    port: MidiOutputPort;
+  };
 };

@@ -1,6 +1,9 @@
 use tauri::Manager;
 
-use midi::{commands::scan_midi, MidiState};
+use midi::{
+    commands::{connect_midi, disconnect_midi, scan_midi},
+    MidiState,
+};
 
 mod midi;
 
@@ -9,7 +12,11 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(MidiState::default())
-        .invoke_handler(tauri::generate_handler![scan_midi])
+        .invoke_handler(tauri::generate_handler![
+            scan_midi,
+            connect_midi,
+            disconnect_midi
+        ])
         .setup(|app| {
             #[cfg(debug_assertions)] // only include this code on debug builds
             {

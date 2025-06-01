@@ -5,7 +5,7 @@ import Select from '../components/common/Select.vue';
 import Button from '../components/common/Button.vue';
 import IconButton from '../components/common/IconButton.vue';
 
-const { midi, scan } = useMidi();
+const { midi, scan, connect, disconnect } = useMidi();
 const selectedInput = ref<string>("");
 const selectedOutput = ref<string>("");
 
@@ -15,8 +15,8 @@ function refresh() {
     scan();
 }
 
-function connect() {
-    // TODO
+function handleConnect() {
+    connect(selectedInput.value, selectedOutput.value);
 }
 </script>
 
@@ -34,7 +34,7 @@ function connect() {
                 <Select v-model="selectedOutput"
                     :options="midi.availableOutputPorts.map(({ id, name }) => ({ value: id, label: name }))"></Select>
             </div>
-            <Button @click="connect">Connect</Button>
+            <Button @click="handleConnect">Connect</Button>
         </div>
     </div>
 </template>
