@@ -1,7 +1,10 @@
+<script setup lang="ts">
+import IconButton from './common/IconButton.vue';
+
+</script>
+
 <template>
     <div class="flex flex-col h-full">
-        <button class="flex items-center justify-center cursor-pointer p-3 hover:bg-[rgba(127,127,127,0.1)]">
-            <span class="material-symbols-sharp">piano</span>
-        </button>
+        <IconButton icon="piano" class="p-3"></IconButton>
     </div>
 </template>

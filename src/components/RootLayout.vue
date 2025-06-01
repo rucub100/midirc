@@ -13,7 +13,7 @@ const currentView = computed(() => (views[currentViewIndex.value]));
 <template>
     <div class="flex flex-row h-full w-full">
         <ViewNavigation></ViewNavigation>
-        <div class="h-full w-[1px] bg-[rgba(127,127,127,0.1)]"></div>
+        <div class="h-full w-[1px] bg-[var(--color-hover)]"></div>
         <component :is="currentView" />
     </div>
 </template>
