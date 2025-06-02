@@ -49,25 +49,23 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="flex w-[200px] border-b relative" :class="{ 'text-[var(--color-text-muted)]': disabled }"
-        ref="dropdownRef">
-        <button class="flex flex-row items-end w-full" :class="{ 'cursor-pointer': !disabled }" @click="toggleMenu"
+    <div class="flex w-[200px] border-b relative" ref="dropdownRef">
+        <button class="flex flex-row items-end w-full"
+            :class="{ 'cursor-pointer': !disabled, 'text-[var(--color-text-muted)]': disabled }" @click="toggleMenu"
             :disabled="disabled">
-            <label v-if="label.length > 0" class="absolute text-xs top-0" :class="{ 'cursor-pointer': !disabled }">{{
-                label }}</label>
+            <label v-if="label.length > 0" class="absolute text-xs top-0"
+                :class="{ 'cursor-pointer': !disabled, 'text-[var(--color-text-muted)]': !disabled, 'text-[var(--color-text-disabled)]': disabled }">{{
+                    label }}</label>
             <div class="mr-auto overflow-hidden text-ellipsis whitespace-nowrap"
                 :class="{ 'pt-4': label.length > 0, 'text-[var(--color-text-muted)]': !model }">
                 {{ valueLabel }}
             </div>
             <span class="material-symbols-sharp">expand_more</span>
         </button>
-        <menu v-if="isMenuOpen" class="flex flex-col w-max absolute top-[calc(100%+10px)] left-0 border select-none">
-            <li
-                class="px-2 py-1 cursor-not-allowed border-b border-[var(--color-outline)] text-[var(--color-text-muted)]">
-                None</li>
+        <menu v-if="isMenuOpen"
+            class="flex flex-col w-max z-10 bg-[var(--color-background)] absolute top-[calc(100%+10px)] left-0 border">
             <li v-for="option in options" :key="option.value"
-                class="px-2 py-1 cursor-pointer hover:bg-[var(--color-hover)]"
-                :class="{ 'bg-[var(--color-active)]': model === option.value }" @click="update(option.value)">{{
+                class="px-2 py-1 cursor-pointer hover:bg-[var(--color-hover)]" @click="update(option.value)">{{
                     option.label }}</li>
         </menu>
     </div>
