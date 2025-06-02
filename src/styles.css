@@ -4,10 +4,22 @@
     /* https://developer.mozilla.org/en-US/docs/Web/CSS/color-scheme */
     color-scheme: light dark;
 
-    --color-background: light-dark(var(--color-neutral-50), var(--color-neutral-900));
-    --color-text: light-dark(var(--color-neutral-950), var(--color-neutral-50));
+    --color-primary: light-dark(var(--color-emerald-700), var(--color-emerald-300));
+    --color-secondary: light-dark(var(--color-slate-700), var(--color-slate-300));
+    --color-tertiary: light-dark(var(--color-lime-700), var(--color-lime-300));
+    --color-background-dim: light-dark(var(--color-neutral-300), var(--color-neutral-900));
+    --color-background: light-dark(var(--color-neutral-200), var(--color-neutral-800));
+    --color-background-bright: light-dark(var(--color-neutral-100), var(--color-neutral-700));
+    --color-container: light-dark(var(--color-neutral-400), var(--color-neutral-600));
+    --color-text: light-dark(var(--color-neutral-800), var(--color-neutral-200));
+    --color-text-muted: var(--color-neutral-500);
     --color-hover: rgba(127, 127, 127, 0.25);
     --color-active: rgba(127, 127, 127, 0.5);
+    --color-outline: rgba(127, 127, 127, 0.75);
+}
+
+* {
+    user-select: none;
 }
 
 html,
@@ -22,6 +34,7 @@ body,
     overflow: hidden;
     background: var(--color-background);
     color: var(--color-text);
+    user-select: none;
 }
 
 @font-face {

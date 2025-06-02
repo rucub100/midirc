@@ -2,19 +2,39 @@ import { invoke } from "@tauri-apps/api/core";
 import { Midi } from "../types/midi";
 
 const COMMAND = {
-  SCAN_MIDI: "scan_midi",
-  CONNECT_MIDI: "connect_midi",
-  DISCONNECT_MIDI: "disconnect_midi",
+  GET_MIDI: "get_midi",
+  SCAN_MIDI_INPUT: "scan_midi_input",
+  SCAN_MIDI_OUTPUT: "scan_midi_output",
+  CONNECT_MIDI_INPUT: "connect_midi_input",
+  CONNECT_MIDI_OUTPUT: "connect_midi_output",
+  DISCONNECT_MIDI_INPUT: "disconnect_midi_input",
+  DISCONNECT_MIDI_OUTPUT: "disconnect_midi_output",
 } as const;
 
-export async function scanMidi() {
-  return invoke<Midi>(COMMAND.SCAN_MIDI);
+export async function getMidi() {
+  return invoke<Midi>(COMMAND.GET_MIDI);
 }
 
-export async function connectMidi(inputId: string, outputId: string) {
-  return invoke<Midi>(COMMAND.CONNECT_MIDI, { inputId, outputId });
+export async function scanMidiInput() {
+  return invoke<Midi>(COMMAND.SCAN_MIDI_INPUT);
 }
 
-export async function disconnectMidi() {
-  return invoke<Midi>(COMMAND.DISCONNECT_MIDI);
+export async function scanMidiOutput() {
+  return invoke<Midi>(COMMAND.SCAN_MIDI_OUTPUT);
+}
+
+export async function connectMidiInput(inputId: string) {
+  return invoke<Midi>(COMMAND.CONNECT_MIDI_INPUT, { inputId });
+}
+
+export async function connectMidiOutput(outputId: string) {
+  return invoke<Midi>(COMMAND.CONNECT_MIDI_OUTPUT, { outputId });
+}
+
+export async function disconnectMidiInput() {
+  return invoke<Midi>(COMMAND.DISCONNECT_MIDI_INPUT);
+}
+
+export async function disconnectMidiOutput() {
+  return invoke<Midi>(COMMAND.DISCONNECT_MIDI_OUTPUT);
 }

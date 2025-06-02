@@ -1,15 +1,21 @@
 <script setup lang="ts">
+import { PropType } from 'vue';
+
 defineProps({
     icon: {
-        type: String,
+        type: String as PropType<string>,
         required: true,
-    }
+    },
+    active: {
+        type: Boolean as PropType<boolean>,
+        default: false,
+    },
 });
 </script>
 
 <template>
-    <button
-        class="flex items-center justify-center cursor-pointer hover:bg-[var(--color-hover)] active:bg-[var(--color-active)]">
+    <button class="flex items-center justify-center cursor-pointer hover:text-[var(--color-text)]"
+        :class="{ 'text-[var(--color-text)]/75': !active, 'text-[var(--color-text)]': active }">
         <span class="material-symbols-sharp">{{ icon }}</span>
     </button>
 </template>

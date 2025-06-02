@@ -1,7 +1,10 @@
 use tauri::Manager;
 
 use midi::{
-    commands::{connect_midi, disconnect_midi, scan_midi},
+    commands::{
+        connect_midi_input, connect_midi_output, disconnect_midi_input, disconnect_midi_output,
+        get_midi, scan_midi_input, scan_midi_output,
+    },
     MidiState,
 };
 
@@ -13,9 +16,13 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(MidiState::default())
         .invoke_handler(tauri::generate_handler![
-            scan_midi,
-            connect_midi,
-            disconnect_midi
+            get_midi,
+            scan_midi_input,
+            scan_midi_output,
+            connect_midi_input,
+            connect_midi_output,
+            disconnect_midi_input,
+            disconnect_midi_output
         ])
         .setup(|app| {
             #[cfg(debug_assertions)] // only include this code on debug builds
@@ -25,6 +32,14 @@ pub fn run() {
                     main_window.open_devtools();
                 }
             }
+            // initialize MIDI state
+            {
+                let midi = app.state::<MidiState>();
+                let mut midi = midi.lock().unwrap();
+                let _ = midi.scan_input();
+                let _ = midi.scan_output();
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())
