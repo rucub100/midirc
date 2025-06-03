@@ -8,6 +8,7 @@ use midi::{
     MidiState,
 };
 
+mod frontend;
 mod midi;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

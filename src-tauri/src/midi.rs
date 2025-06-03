@@ -1,69 +1,37 @@
-use std::{fmt::Debug, sync::Mutex};
+use std::sync::Mutex;
 
 use midir::MidiInput;
 
 pub mod commands;
 
-#[derive(Default, Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MidiInputPort {
     pub name: String,
     pub id: String,
 }
 
-#[derive(Default, Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MidiOutputPort {
     pub name: String,
     pub id: String,
 }
 
-#[derive(Default, Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
 pub struct MidiInputConnection {
     pub port: MidiInputPort,
+    _connection: midir::MidiInputConnection<()>,
 }
 
-#[derive(Default, Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
 pub struct MidiOutputConnection {
     pub port: MidiOutputPort,
+    _connection: midir::MidiOutputConnection,
 }
 
-#[derive(Default, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub struct MidiStateInner {
-    available_input_ports: Vec<MidiInputPort>,
-    available_output_ports: Vec<MidiOutputPort>,
-    #[serde(skip)]
-    _input_connection: Option<midir::MidiInputConnection<()>>,
-    input_connection: Option<MidiInputConnection>,
-    #[serde(skip)]
-    _output_connection: Option<midir::MidiOutputConnection>,
-    output_connection: Option<MidiOutputConnection>,
-}
-
-impl Debug for MidiStateInner {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MidiStateInner")
-            .field("available_input_ports", &self.available_input_ports)
-            .field("available_output_ports", &self.available_output_ports)
-            .field("input_connection", &self.input_connection)
-            .finish()
-    }
-}
-
-impl Clone for MidiStateInner {
-    fn clone(&self) -> Self {
-        MidiStateInner {
-            available_input_ports: self.available_input_ports.clone(),
-            available_output_ports: self.available_output_ports.clone(),
-            _input_connection: None,
-            input_connection: self.input_connection.clone(),
-            _output_connection: None,
-            output_connection: self.output_connection.clone(),
-        }
-    }
+    pub available_input_ports: Vec<MidiInputPort>,
+    pub available_output_ports: Vec<MidiOutputPort>,
+    pub input_connection: Option<MidiInputConnection>,
+    pub output_connection: Option<MidiOutputConnection>,
 }
 
 impl MidiStateInner {
@@ -106,11 +74,10 @@ impl MidiStateInner {
 
     pub fn disconnect_input(&mut self) {
         self.input_connection = None;
-        self._input_connection = None;
     }
 
     pub fn connect_input(&mut self, index: usize) -> Result<(), String> {
-        if self.input_connection.is_some() || self._input_connection.is_some() {
+        if self.input_connection.is_some() {
             return Err("Input connection already exists. Disconnect first.".to_string());
         }
 
@@ -139,9 +106,9 @@ impl MidiStateInner {
             )
             .map_err(|e| format!("Failed to connect to input port: {}", e))?;
 
-        self._input_connection = Some(connection);
         self.input_connection = Some(MidiInputConnection {
             port: port.to_owned(),
+            _connection: connection,
         });
 
         Ok(())
@@ -149,11 +116,10 @@ impl MidiStateInner {
 
     pub fn disconnect_output(&mut self) {
         self.output_connection = None;
-        self._output_connection = None;
     }
 
     pub fn connect_output(&mut self, index: usize) -> Result<(), String> {
-        if self.output_connection.is_some() || self._output_connection.is_some() {
+        if self.output_connection.is_some() {
             return Err("Output connection already exists. Disconnect first.".to_string());
         }
 
@@ -175,9 +141,9 @@ impl MidiStateInner {
             .connect(&midi_port, port.name.as_str())
             .map_err(|e| format!("Failed to connect to output port: {}", e))?;
 
-        self._output_connection = Some(connection);
         self.output_connection = Some(MidiOutputConnection {
             port: port.to_owned(),
+            _connection: connection,
         });
 
         Ok(())

@@ -6,7 +6,7 @@ import IconButton from './common/IconButton.vue';
 
 const { midi, scanInput, connectInput, disconnectInput } = useMidi();
 const selectedInput = computed<string>({
-    get: () => midi.value.inputConnection?.port.id || "",
+    get: () => midi.value.inputConnection?.id || "",
     set: (val: string) => {
         if (val.length > 0) {
             connectInput(val);
@@ -32,7 +32,7 @@ function handleDisconnect() {
         <IconButton v-else icon="power_off" title="Disconnect Input" class="p-2" @click="handleDisconnect()">
         </IconButton>
         <Select v-model="selectedInput" :disabled="!!selectedInput" label="Select MIDI Input"
-            :title="selectedInput ? `Input connected to ${midi.inputConnection?.port.name}` : undefined"
+            :title="selectedInput ? `Input connected to ${midi.inputConnection?.name}` : undefined"
             :options="midi.availableInputPorts.map(({ id, name }) => ({ value: id, label: name }))"></Select>
     </div>
 </template>
