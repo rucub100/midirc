@@ -9,6 +9,7 @@ const COMMAND = {
   CONNECT_MIDI_OUTPUT: "connect_midi_output",
   DISCONNECT_MIDI_INPUT: "disconnect_midi_input",
   DISCONNECT_MIDI_OUTPUT: "disconnect_midi_output",
+  PLAY_MIDI_DEMO: "play_midi_demo",
 } as const;
 
 export async function getMidi() {
@@ -37,4 +38,8 @@ export async function disconnectMidiInput() {
 
 export async function disconnectMidiOutput() {
   return invoke<Midi>(COMMAND.DISCONNECT_MIDI_OUTPUT);
+}
+
+export async function playMidiDemo() {
+  return invoke<void>(COMMAND.PLAY_MIDI_DEMO);
 }

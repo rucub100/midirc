@@ -1,4 +1,7 @@
-use std::sync::Mutex;
+use std::{
+    sync::{Arc, Mutex},
+    thread,
+};
 
 use midir::MidiInput;
 
@@ -23,7 +26,7 @@ pub struct MidiInputConnection {
 
 pub struct MidiOutputConnection {
     pub port: MidiOutputPort,
-    _connection: midir::MidiOutputConnection,
+    _connection: Arc<Mutex<midir::MidiOutputConnection>>,
 }
 
 #[derive(Default)]
@@ -101,6 +104,8 @@ impl MidiStateInner {
                 port.name.as_str(),
                 |_, message, _| {
                     println!("Received MIDI message: {:?}", message);
+                    // TODO: add raw message to a buffer in the state
+                    // possiblely with additional Arc<Mutex<Vec<u8>>> if needed
                 },
                 (),
             )
@@ -143,7 +148,29 @@ impl MidiStateInner {
 
         self.output_connection = Some(MidiOutputConnection {
             port: port.to_owned(),
-            _connection: connection,
+            _connection: Arc::new(Mutex::new(connection)),
+        });
+
+        Ok(())
+    }
+
+    pub fn play_demo(&self) -> Result<(), String> {
+        if self.output_connection.is_none() {
+            return Err(
+                "No output connection established. Connect to an output port first.".to_string(),
+            );
+        }
+
+        let connection = &self.output_connection.as_ref().unwrap()._connection;
+        let connection = Arc::clone(connection);
+
+        thread::spawn(move || {
+            let message: Vec<u8> = vec![0x90, 60, 64]; // Note On: Channel 1, Note 60 (Middle C), Velocity 127
+            let mut connection = connection.lock().unwrap();
+            (*connection).send(&message).unwrap(); // Note On: Channel 1, Note 60 (Middle C), Velocity 127
+            thread::sleep(std::time::Duration::from_secs(1)); // Wait for 1 second
+            let message: Vec<u8> = vec![60, 0]; // Note Off: Channel 1, Note 60 (Middle C), Velocity 0
+            (*connection).send(&message).unwrap(); // Note Off: Channel 1, Note 60 (Middle C), Velocity 0
         });
 
         Ok(())

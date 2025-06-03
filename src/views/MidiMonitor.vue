@@ -1,6 +1,15 @@
 <script setup lang="ts">
+import IconButton from '../components/common/IconButton.vue';
 import MidiInputSelector from '../components/MidiInputSelector.vue';
 import MidiOutputSelector from '../components/MidiOutputSelector.vue';
+import { useMidi } from '../hooks/use-midi';
+
+const { playDemo } = useMidi();
+
+function handlePlayDemo() {
+    console.log('Playing demo...');
+    playDemo();
+}
 </script>
 
 <template>
@@ -14,6 +23,7 @@ import MidiOutputSelector from '../components/MidiOutputSelector.vue';
             from
             the desired instrument
         </h1>
+        <IconButton icon="play_circle" title="Play Example" @click="handlePlayDemo"></IconButton>
         <h1 class="text-[var(--color-text-muted)]">Play some notes on your instrument to verify that the MIDI events are
             displayed below</h1>
         <p>TODO</p>

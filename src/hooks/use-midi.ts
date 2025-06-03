@@ -6,6 +6,7 @@ import {
   disconnectMidiInput,
   disconnectMidiOutput,
   getMidi,
+  playMidiDemo,
   scanMidiInput,
   scanMidiOutput,
 } from "../tauri/midi-commands";
@@ -97,6 +98,11 @@ function disconnectOutput() {
     });
 }
 
+function playDemo() {
+  // TODO result and error handling
+  playMidiDemo();
+}
+
 export function useMidi() {
   return {
     midi: globalMidi,
@@ -106,5 +112,6 @@ export function useMidi() {
     connectOutput,
     disconnectInput,
     disconnectOutput,
+    playDemo,
   };
 }
