@@ -6,6 +6,7 @@ use std::{
 use midir::MidiInput;
 
 pub mod commands;
+pub mod message;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MidiInputPort {
