@@ -1,6 +1,7 @@
 // https://midi.org/midi-1-0-detailed-specification
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
 pub enum MidiChannel {
     Channel1,
     Channel2,
@@ -72,7 +73,8 @@ impl TryFrom<u8> for MidiChannel {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum ChannelVoiceMessage {
     NoteOff { note: u8, velocity: u8 },
     NoteOn { note: u8, velocity: u8 },
@@ -83,7 +85,8 @@ pub enum ChannelVoiceMessage {
     PitchBendChange(u16),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum ChannelModeMessage {
     AllSoundOff,
     ResetAllControllers,
@@ -96,13 +99,15 @@ pub enum ChannelModeMessage {
     PolyMode,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum ChannelMessage {
     Voice(ChannelVoiceMessage),
     Mode(ChannelModeMessage),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum SystemCommonMessage {
     MidiTimeCodeQuarterFrame,
     SongPositionPointer(u16),
@@ -111,7 +116,8 @@ pub enum SystemCommonMessage {
     EndOfSystemExclusive,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum SystemRealTimeMessage {
     TimingClock,
     Start,
@@ -121,7 +127,8 @@ pub enum SystemRealTimeMessage {
     SystemReset,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum SystemExclusiveSubId {
     ManufacturerIdentification(Vec<u8>),
     NonCommercial,
@@ -129,20 +136,23 @@ pub enum SystemExclusiveSubId {
     RealTime,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct SystemExclusiveMessage {
     sub_id: SystemExclusiveSubId,
     data: Vec<u8>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum SystemMessage {
     Common(SystemCommonMessage),
     RealTime(SystemRealTimeMessage),
     Exclusive(SystemExclusiveMessage),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum MidiMessage {
     Channel {
         channel: MidiChannel,

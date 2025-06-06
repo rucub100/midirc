@@ -1,5 +1,7 @@
+use tauri::ipc::Channel;
+
 use super::MidiState;
-use crate::frontend::Midi;
+use crate::{frontend::Midi, midi::message::MidiMessage};
 
 #[tauri::command]
 pub async fn get_midi<'a>(state: tauri::State<'a, MidiState>) -> Result<Midi, String> {
@@ -74,4 +76,14 @@ pub async fn play_midi_demo<'a>(state: tauri::State<'a, MidiState>) -> Result<()
     // TODO return midi instead and later some async status update (e.g. via event)
     // check if channel feature of tauri makes sense here
     midi.play_demo()
+}
+
+#[tauri::command]
+pub async fn register_midi_channel<'a>(
+    state: tauri::State<'a, MidiState>,
+    channel: Channel<MidiMessage>,
+) -> Result<(), String> {
+    let mut midi = state.lock().unwrap();
+    midi.set_frontend_channel(channel);
+    Ok(())
 }

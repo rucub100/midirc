@@ -4,6 +4,9 @@ use std::{
 };
 
 use midir::MidiInput;
+use tauri::ipc::Channel;
+
+use crate::midi::message::{MidiChannel, MidiMessage};
 
 pub mod commands;
 pub mod message;
@@ -36,6 +39,7 @@ pub struct MidiStateInner {
     pub available_output_ports: Vec<MidiOutputPort>,
     pub input_connection: Option<MidiInputConnection>,
     pub output_connection: Option<MidiOutputConnection>,
+    pub frontend_channel: Option<Channel<MidiMessage>>,
 }
 
 impl MidiStateInner {
@@ -99,12 +103,26 @@ impl MidiStateInner {
         let midi_port =
             midi_port.ok_or_else(|| format!("Input port not found: {}", port.name.as_str()))?;
 
+        let channel = self.frontend_channel.clone();
         let connection = input
             .connect(
                 &midi_port,
                 port.name.as_str(),
-                |_, message, _| {
-                    println!("Received MIDI message: {:?}", message);
+                move |_, message, _| {
+                    let midi_message_result: Result<MidiMessage, String> = message.try_into();
+                    let message = match midi_message_result {
+                        Ok(msg) => msg,
+                        Err(e) => {
+                            eprintln!("Error parsing MIDI message: {}", e);
+                            return;
+                        }
+                    };
+                    println!("{:?}", message);
+                    if let Some(ref ch) = channel.as_ref() {
+                        ch.send(message).unwrap_or_else(|e| {
+                            eprintln!("Failed to send MIDI message to frontend: {}", e);
+                        });
+                    }
                     // TODO: add raw message to a buffer in the state
                     // possiblely with additional Arc<Mutex<Vec<u8>>> if needed
                 },
@@ -166,15 +184,23 @@ impl MidiStateInner {
         let connection = Arc::clone(connection);
 
         thread::spawn(move || {
-            let message: Vec<u8> = vec![0x90, 60, 64]; // Note On: Channel 1, Note 60 (Middle C), Velocity 127
+            let middle_c_on: Vec<u8> = MidiMessage::note_on(MidiChannel::Channel1, 60, 64)
+                .unwrap()
+                .into();
+            let middle_c_off: Vec<u8> = MidiMessage::note_off(MidiChannel::Channel1, 60, 0)
+                .unwrap()
+                .into();
             let mut connection = connection.lock().unwrap();
-            (*connection).send(&message).unwrap(); // Note On: Channel 1, Note 60 (Middle C), Velocity 127
-            thread::sleep(std::time::Duration::from_secs(1)); // Wait for 1 second
-            let message: Vec<u8> = vec![60, 0]; // Note Off: Channel 1, Note 60 (Middle C), Velocity 0
-            (*connection).send(&message).unwrap(); // Note Off: Channel 1, Note 60 (Middle C), Velocity 0
+            (*connection).send(&middle_c_on).unwrap();
+            thread::sleep(std::time::Duration::from_secs(1));
+            (*connection).send(&middle_c_off).unwrap();
         });
 
         Ok(())
+    }
+
+    pub fn set_frontend_channel(&mut self, channel: Channel<MidiMessage>) {
+        self.frontend_channel = Some(channel);
     }
 }
 

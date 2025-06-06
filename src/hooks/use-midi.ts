@@ -7,6 +7,7 @@ import {
   disconnectMidiOutput,
   getMidi,
   playMidiDemo,
+  registerMidiChannel,
   scanMidiInput,
   scanMidiOutput,
 } from "../tauri/midi-commands";
@@ -15,7 +16,20 @@ const defaultMidi = {
   availableInputPorts: [],
   availableOutputPorts: [],
 } satisfies Midi;
+
 const globalMidi = ref<Midi>(defaultMidi);
+
+registerMidiChannel()
+  .then((channel) => {
+    channel.onmessage = (msg) => {
+      console.log("Received MIDI message:", msg);
+      // TODO: Here you can handle the MIDI message as needed
+      // For example, you could update the globalMidi state or trigger some action
+    };
+  })
+  .catch((error) => {
+    console.error("Error registering MIDI channel:", error);
+  });
 
 getMidi()
   .then((midi) => {

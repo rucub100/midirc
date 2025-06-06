@@ -1,5 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { Midi } from "../types/midi";
+import { MidiMessage } from "../types/midi-message";
 
 const COMMAND = {
   GET_MIDI: "get_midi",
@@ -10,6 +11,7 @@ const COMMAND = {
   DISCONNECT_MIDI_INPUT: "disconnect_midi_input",
   DISCONNECT_MIDI_OUTPUT: "disconnect_midi_output",
   PLAY_MIDI_DEMO: "play_midi_demo",
+  REGISTER_MIDI_CHANNEL: "register_midi_channel",
 } as const;
 
 export async function getMidi() {
@@ -42,4 +44,10 @@ export async function disconnectMidiOutput() {
 
 export async function playMidiDemo() {
   return invoke<void>(COMMAND.PLAY_MIDI_DEMO);
+}
+
+export async function registerMidiChannel(): Promise<Channel<MidiMessage>> {
+  const channel = new Channel<MidiMessage>();
+  await invoke<void>(COMMAND.REGISTER_MIDI_CHANNEL, { channel });
+  return channel;
 }
