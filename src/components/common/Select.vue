@@ -54,7 +54,7 @@ onUnmounted(() => {
             :class="{ 'cursor-pointer': !disabled, 'text-[var(--color-text-muted)]': disabled }" @click="toggleMenu"
             :disabled="disabled">
             <label v-if="label.length > 0" class="absolute text-xs top-0"
-                :class="{ 'cursor-pointer': !disabled, 'text-[var(--color-text-muted)]': !disabled, 'text-[var(--color-text-disabled)]': disabled }">{{
+                :class="{ 'cursor-pointer': !disabled, 'text-[var(--color-text-disabled)]': disabled }">{{
                     label }}</label>
             <div class="mr-auto overflow-hidden text-ellipsis whitespace-nowrap"
                 :class="{ 'pt-4': label.length > 0, 'text-[var(--color-text-muted)]': !model }">
