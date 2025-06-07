@@ -4,7 +4,7 @@ Transform your digital instrument experience. With midirc, a powerful Tauri and 
 
 ## Roadmap
 
-- [ ] Setup instrument connection (input/output)
+- [x] Setup instrument connection (input/output)
 - [ ] MIDI Recorder
 - [ ] MIDI Player (playback)
 - [ ] Save/Load Standard MIDI Files (SMF)
