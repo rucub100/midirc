@@ -12,6 +12,7 @@ use crate::midi::message::{MidiChannel, MidiMessage, TimeStampedMidiMessage};
 
 pub mod commands;
 pub mod message;
+pub mod smf;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MidiInputPort {
