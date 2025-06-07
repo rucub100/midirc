@@ -1,12 +1,14 @@
 use std::{
+    collections::VecDeque,
     sync::{Arc, Mutex},
     thread,
+    time::Instant,
 };
 
 use midir::MidiInput;
 use tauri::ipc::Channel;
 
-use crate::midi::message::{MidiChannel, MidiMessage};
+use crate::midi::message::{MidiChannel, MidiMessage, TimeStampedMidiMessage};
 
 pub mod commands;
 pub mod message;
@@ -40,6 +42,7 @@ pub struct MidiStateInner {
     pub input_connection: Option<MidiInputConnection>,
     pub output_connection: Option<MidiOutputConnection>,
     pub frontend_channel: Option<Channel<MidiMessage>>,
+    pub buffer: Arc<Mutex<VecDeque<TimeStampedMidiMessage>>>,
 }
 
 impl MidiStateInner {
@@ -103,12 +106,15 @@ impl MidiStateInner {
         let midi_port =
             midi_port.ok_or_else(|| format!("Input port not found: {}", port.name.as_str()))?;
 
-        let channel = self.frontend_channel.clone();
+        let buffer = self.buffer.clone();
+        let frontend_channel = self.frontend_channel.clone();
         let connection = input
             .connect(
                 &midi_port,
                 port.name.as_str(),
                 move |_, message, _| {
+                    let timestamp = Instant::now();
+
                     let midi_message_result: Result<MidiMessage, String> = message.try_into();
                     let message = match midi_message_result {
                         Ok(msg) => msg,
@@ -117,14 +123,23 @@ impl MidiStateInner {
                             return;
                         }
                     };
-                    println!("{:?}", message);
-                    if let Some(ref ch) = channel.as_ref() {
+
+                    let mut buffer = buffer.lock().unwrap();
+                    buffer.push_back(TimeStampedMidiMessage {
+                        message: message.clone(),
+                        timestamp,
+                    });
+
+                    if buffer.len() > 1_000_000 {
+                        eprintln!("MIDI buffer overflow!!!");
+                        buffer.pop_front();
+                    }
+
+                    if let Some(ref ch) = frontend_channel.as_ref() {
                         ch.send(message).unwrap_or_else(|e| {
                             eprintln!("Failed to send MIDI message to frontend: {}", e);
                         });
                     }
-                    // TODO: add raw message to a buffer in the state
-                    // possiblely with additional Arc<Mutex<Vec<u8>>> if needed
                 },
                 (),
             )
@@ -183,6 +198,10 @@ impl MidiStateInner {
         let connection = &self.output_connection.as_ref().unwrap()._connection;
         let connection = Arc::clone(connection);
 
+        // FIXME: use e.g. thread-priority crate to provide safe and unified thread priority management
+        // For this use case of music playback, we want the highest, most deterministic priority.
+        // This usually corresponds to a "real-time" or "time-critical" scheduling policy.
+        // Another important craete would be spin_sleep to compensate the jittering of the thread sleep
         thread::spawn(move || {
             let middle_c_on: Vec<u8> = MidiMessage::note_on(MidiChannel::Channel1, 60, 64)
                 .unwrap()

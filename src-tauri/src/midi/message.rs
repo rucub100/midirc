@@ -1,5 +1,7 @@
 // https://midi.org/midi-1-0-detailed-specification
 
+use std::time::Instant;
+
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 pub enum MidiChannel {
@@ -607,4 +609,10 @@ impl MidiMessage {
             }),
         })
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct TimeStampedMidiMessage {
+    pub timestamp: Instant,
+    pub message: MidiMessage,
 }
