@@ -9,9 +9,16 @@ pub enum MidiFormat {
     MultiSequence,
 }
 
+pub enum FramesPerSecond {
+    Fps24,
+    Fps25,
+    Fps30,
+    Fps30DropFrame,
+}
+
 pub enum MidiDivision {
     TicksPerQuarterNote(u16),
-    TimeCode(u8, u8),
+    TimeCode(FramesPerSecond, u8),
 }
 
 pub enum MusicalScale {
@@ -132,9 +139,69 @@ fn from_var_length_bytes(bytes: &[u8]) -> Result<u32, String> {
     Ok(value)
 }
 
+fn calc_delta_time_microseconds(delta: u32, tempo: u32, division: &MidiDivision) -> u64 {
+    let delta_u64 = delta as u64;
+    let tempo_u64 = tempo as u64;
+
+    match division {
+        MidiDivision::TicksPerQuarterNote(ticks) => delta_u64 * tempo_u64 / (*ticks as u64),
+        // Time code is less common and should be avoided if possible.
+        MidiDivision::TimeCode(frames_per_second, ticks) => {
+            let ticks_u64 = *ticks as u64;
+
+            match frames_per_second {
+                FramesPerSecond::Fps25 => delta_u64 * 1_000_000 / (25 * ticks_u64),
+                FramesPerSecond::Fps24 => delta_u64 * 1_000_000 / (24 * ticks_u64),
+                FramesPerSecond::Fps30 => delta_u64 * 100_000 / (3 * ticks_u64),
+                FramesPerSecond::Fps30DropFrame => delta_u64 * 100_100 / (3 * ticks_u64),
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn calc_delta_time_microseconds_time_code_25_40() {
+        let delta = 1234;
+        let tempo = 500_000; // 120 BPM (500,000 microseconds per quarter note)
+        let division = MidiDivision::TimeCode(FramesPerSecond::Fps25, 40);
+
+        let result = calc_delta_time_microseconds(delta, tempo, &division);
+        assert_eq!(result, 1_234_000);
+    }
+
+    #[test]
+    fn calc_delta_time_microseconds_time_code_30_80() {
+        let delta = 2400;
+        let tempo = 500_000; // 120 BPM (500,000 microseconds per quarter note)
+        let division = MidiDivision::TimeCode(FramesPerSecond::Fps30, 80);
+
+        let result = calc_delta_time_microseconds(delta, tempo, &division);
+        assert_eq!(result, 1_000_000);
+    }
+
+    #[test]
+    fn calc_delta_time_microseconds_time_code_30_drop_frame() {
+        let delta = 2400;
+        let tempo = 500_000; // 120 BPM (500,000 microseconds per quarter note)
+        let division = MidiDivision::TimeCode(FramesPerSecond::Fps30DropFrame, 80);
+
+        let result = calc_delta_time_microseconds(delta, tempo, &division);
+        assert_eq!(result, 1_001_000);
+    }
+
+    #[test]
+    fn calc_delta_time_microseconds_ticks_per_quarter_note() {
+        let delta = 6144;
+        let tempo = 500_000; // 120 BPM (500,000 microseconds per quarter note)
+        let division = MidiDivision::TicksPerQuarterNote(96);
+
+        let result = calc_delta_time_microseconds(delta, tempo, &division);
+        assert_eq!(result, 32_000_000);
+    }
 
     #[test]
     fn to_var_length_bytes_spec_examples() {
