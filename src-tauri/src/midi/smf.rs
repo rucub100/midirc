@@ -170,7 +170,7 @@ fn get_var_length_bytes_length(bytes: &[u8]) -> Result<usize, String> {
     Ok(length)
 }
 
-fn get_event_length(data: &[u8]) -> Result<usize, String> {
+fn get_event_length(data: &[u8], running_status_length: Option<u8>) -> Result<usize, String> {
     if data.len() == 0 {
         return Err("Data is empty, cannot determine event length".to_string());
     }
@@ -180,16 +180,11 @@ fn get_event_length(data: &[u8]) -> Result<usize, String> {
     Ok(match first_byte {
         // Running status
         0x00..=0x7F => {
-            // assume running status calc length until next status byte
-            let mut length = 1;
-            for &byte in data.iter().skip(1) {
-                if byte & 0x80 != 0 {
-                    break; // found a status byte, stop counting
-                }
-                length += 1;
+            if let Some(length) = running_status_length {
+                length as usize
+            } else {
+                return Err("Running status not set, cannot determine event length".to_string());
             }
-
-            length
         }
         // Channel messages
         0x80..=0xEF => {
@@ -611,17 +606,18 @@ fn parse_midi_file_track(data: &[u8], offset: &mut usize) -> Result<Vec<MidiTrac
     }
 
     let track_data = &data[*offset..*offset + track_length as usize];
-    let mut track_offset = *offset;
     *offset += track_length as usize;
 
     let mut track: Vec<MidiTrackEvent> = Vec::new();
 
+    let mut track_offset = 0;
     let mut running_status: Option<u8> = None;
+    let mut running_status_length: Option<u8> = None;
     loop {
         let var_length = get_var_length_bytes_length(&track_data[track_offset..])?;
         let delta = from_var_length_bytes(&track_data[track_offset..track_offset + var_length])?;
         track_offset += var_length;
-        let event_length = get_event_length(&track_data[track_offset..])?;
+        let event_length = get_event_length(&track_data[track_offset..], running_status_length)?;
         let (event, new_status) = parse_midi_track_event(
             &track_data[track_offset..track_offset + event_length],
             running_status,
@@ -630,8 +626,10 @@ fn parse_midi_file_track(data: &[u8], offset: &mut usize) -> Result<Vec<MidiTrac
 
         if !matches!(event, Event::MidiEvent(_)) {
             running_status = None;
+            running_status_length = None;
         } else if new_status != 0 {
             running_status = Some(new_status);
+            running_status_length = Some((event_length - 1) as u8);
         }
 
         // SysEx events are not supported
@@ -683,6 +681,42 @@ impl TryFrom<&[u8]> for MidiFile {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_midi_file() {
+        let midi_data: &[u8] = &[
+            0x4D, 0x54, 0x68, 0x64, // MThd
+            0x00, 0x00, 0x00, 0x06, // chunk length
+            0x00, 0x00, // format 0
+            0x00, 0x01, // one track
+            0x00, 0x60, // division: 96 ticks per quarter note
+            0x4D, 0x54, 0x72, 0x6B, // MTrk
+            0x00, 0x00, 0x00, 0x3B, // chunk length
+            0x00, 0xFF, 0x58, 0x04, 0x04, 0x02, 0x18,
+            0x08, // time signature: 4/4, 24 clocks per click, 8 notated 32nd notes per quarter note
+            0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1,
+            0x20, // set tempo: 500000 microseconds per quarter note = 120 BPM
+            0x00, 0xC0, 0x05, // program change: channel 0, program 5
+            0x00, 0xC1, 0x2E, // program change: channel 1, program 46
+            0x00, 0xC2, 0x46, // program change: channel 2, program 70
+            0x00, 0x92, 0x30, 0x60, // note on: channel 2, note 48, velocity 96
+            0x00, 0x3C, 0x60, // note on: channel 2, note 60, velocity 96 (running status)
+            0x60, 0x91, 0x43, 0x40, // ...
+            0x60, 0x90, 0x4C, 0x20, // ...
+            0x81, 0x40, 0x82, 0x30, 0x40, // ...
+            0x00, 0x3C, 0x40, // ...
+            0x00, 0x81, 0x43, 0x40, // ...
+            0x00, 0x80, 0x4C, 0x40, // ...
+            0x00, 0xFF, 0x2F, 0x00, // end of track
+        ];
+
+        let midi_file = MidiFile::try_from(midi_data);
+
+        if midi_file.is_err() {
+            eprintln!("Failed to parse MIDI file: {:?}", midi_file.err());
+            assert!(false, "MIDI file parsing failed");
+        }
+    }
 
     #[test]
     fn calc_delta_time_microseconds_time_code_25_40() {
