@@ -678,6 +678,66 @@ impl TryFrom<&[u8]> for MidiFile {
     }
 }
 
+impl TryFrom<&MidiFile> for Vec<u8> {
+    type Error = String;
+
+    fn try_from(value: &MidiFile) -> Result<Self, Self::Error> {
+        let mut data = Vec::new();
+
+        // serialize header chunk
+        data.extend_from_slice(MIDI_HEADER_CHUNK_ASCII_TYPE);
+        data.extend_from_slice(&[0x00, 0x00, 0x00, 0x06]); // header length
+        data.extend_from_slice(&match value.header.format {
+            MidiFormat::SingleMultiChannelTrack => [0x00, 0x00],
+            MidiFormat::MultiTrackSequence => [0x00, 0x01],
+            MidiFormat::MultiSequence => [0x00, 0x02],
+        });
+        data.extend_from_slice(&value.header.num_tracks.to_be_bytes());
+        data.extend_from_slice(&match value.header.division {
+            MidiDivision::TicksPerQuarterNote(ticks) => ticks.to_be_bytes(),
+            MidiDivision::TimeCode(ref frames_per_second, ticks) => {
+                let fps_value = match frames_per_second {
+                    FramesPerSecond::Fps24 => -24 as i16,
+                    FramesPerSecond::Fps25 => -25 as i16,
+                    FramesPerSecond::Fps30 => -30 as i16,
+                    FramesPerSecond::Fps30DropFrame => -29 as i16,
+                } as u16;
+                let division_value = (fps_value << 8) | (ticks as u16);
+                division_value.to_be_bytes()
+            }
+        });
+
+        if value.header.num_tracks == 0 {
+            return Err("MIDI file must contain at least one track".to_string());
+        } else if (value.header.num_tracks as usize) != value.tracks.len() {
+            return Err(
+                "Number of tracks in header does not match number of tracks in file".to_string(),
+            );
+        }
+
+        // serialize track chunks
+        for track in &value.tracks {
+            data.extend_from_slice(MIDI_TRACK_CHUNK_ASCII_TYPE);
+            let mut track_data: Vec<u8> = Vec::new();
+
+            for event in track {
+                let delta_bytes = to_var_length_bytes(event.delta_time)?;
+                track_data.extend(delta_bytes);
+
+                // TODO: event to bytes
+                // make sure to handle running status for MIDI events
+                // ignore SysEx events for now
+                // add support for meta events
+            }
+
+            data.extend_from_slice(&(track_data.len() as u32).to_be_bytes());
+            data.extend(&track_data);
+        }
+
+        Ok(data)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
