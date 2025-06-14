@@ -1,4 +1,4 @@
-use crate::midi::message::{ChannelMessage, MidiChannel};
+use crate::midi::message::{MidiChannel, MidiMessage};
 
 const MIDI_HEADER_CHUNK_ASCII_TYPE: &[u8; 4] = b"MThd";
 const MIDI_TRACK_CHUNK_ASCII_TYPE: &[u8; 4] = b"MTrk";
@@ -61,11 +61,12 @@ pub enum MetaEvent {
         key: i8,
         scale: MusicalScale,
     },
+    SequencerSpecific(Vec<u8>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
-    MidiEvent(ChannelMessage),
+    MidiEvent(MidiMessage),
     SysExEvent,
     MetaEvent(MetaEvent),
 }
@@ -385,16 +386,200 @@ fn parse_midi_track_event(data: &[u8], running_status: Option<u8>) -> Result<(Ev
                 return Err("Missing running status for MIDI event".to_string());
             }
             let status = running_status.unwrap();
-
-            todo!("Running status parsing not implemented yet");
+            let mut message_data = vec![status];
+            message_data.extend_from_slice(data);
+            Ok((
+                Event::MidiEvent(MidiMessage::try_from(message_data.as_slice())?),
+                0,
+            ))
         }
         // Channel messages
-        0x80..=0xEF => {
-            todo!("Channel message parsing not implemented yet");
-        }
+        0x80..=0xEF => Ok((Event::MidiEvent(MidiMessage::try_from(data)?), first_byte)),
         // Meta event
         0xFF => {
-            todo!("Meta event parsing not implemented yet");
+            let event = Event::MetaEvent(match data[1] {
+                0x00 => {
+                    if data[2] != 0x02 {
+                        return Err("Invalid sequence number meta event".to_string());
+                    }
+
+                    MetaEvent::SequenceNumber(u16::from_be_bytes(
+                        data[3..=4]
+                            .try_into()
+                            .map_err(|_| "Invalid sequence number bytes".to_string())?,
+                    ))
+                }
+                0x01 => {
+                    let var_length = get_var_length_bytes_length(&data[2..])?;
+                    let length = from_var_length_bytes(&data[2..2 + var_length])? as usize;
+
+                    MetaEvent::TextEvent(
+                        String::from_utf8(data[2 + var_length..2 + var_length + length].to_vec())
+                            .map_err(|_| "Invalid UTF-8 in text event".to_string())?,
+                    )
+                }
+                0x02 => {
+                    let var_length = get_var_length_bytes_length(&data[2..])?;
+                    let length = from_var_length_bytes(&data[2..2 + var_length])? as usize;
+
+                    MetaEvent::CopyrightNotice(
+                        String::from_utf8(data[2 + var_length..2 + var_length + length].to_vec())
+                            .map_err(|_| "Invalid UTF-8 in text event".to_string())?,
+                    )
+                }
+                0x03 => {
+                    let var_length = get_var_length_bytes_length(&data[2..])?;
+                    let length = from_var_length_bytes(&data[2..2 + var_length])? as usize;
+
+                    // FIXME: we need to differentiate between sequence name and track name
+                    // for now we assume it's a sequence name (format 0 or first track in format 1)
+                    MetaEvent::SequenceName(
+                        String::from_utf8(data[2 + var_length..2 + var_length + length].to_vec())
+                            .map_err(|_| "Invalid UTF-8 in text event".to_string())?,
+                    )
+                }
+                0x04 => {
+                    let var_length = get_var_length_bytes_length(&data[2..])?;
+                    let length = from_var_length_bytes(&data[2..2 + var_length])? as usize;
+
+                    MetaEvent::InstrumentName(
+                        String::from_utf8(data[2 + var_length..2 + var_length + length].to_vec())
+                            .map_err(|_| "Invalid UTF-8 in text event".to_string())?,
+                    )
+                }
+                0x05 => {
+                    let var_length = get_var_length_bytes_length(&data[2..])?;
+                    let length = from_var_length_bytes(&data[2..2 + var_length])? as usize;
+
+                    MetaEvent::Lyric(
+                        String::from_utf8(data[2 + var_length..2 + var_length + length].to_vec())
+                            .map_err(|_| "Invalid UTF-8 in text event".to_string())?,
+                    )
+                }
+                0x06 => {
+                    let var_length = get_var_length_bytes_length(&data[2..])?;
+                    let length = from_var_length_bytes(&data[2..2 + var_length])? as usize;
+
+                    MetaEvent::Marker(
+                        String::from_utf8(data[2 + var_length..2 + var_length + length].to_vec())
+                            .map_err(|_| "Invalid UTF-8 in text event".to_string())?,
+                    )
+                }
+                0x07 => {
+                    let var_length = get_var_length_bytes_length(&data[2..])?;
+                    let length = from_var_length_bytes(&data[2..2 + var_length])? as usize;
+
+                    MetaEvent::CuePoint(
+                        String::from_utf8(data[2 + var_length..2 + var_length + length].to_vec())
+                            .map_err(|_| "Invalid UTF-8 in text event".to_string())?,
+                    )
+                }
+                0x20 => {
+                    if data[2] != 0x01 {
+                        return Err("Invalid MIDI Channel Prefix meta event".to_string());
+                    }
+
+                    let channel = MidiChannel::try_from(data[3])?;
+                    MetaEvent::MidiChannelPrefix(channel)
+                }
+                0x2F => {
+                    if data[2] != 0x00 {
+                        return Err("Invalid End of Track meta event".to_string());
+                    }
+
+                    MetaEvent::EndOfTrack
+                }
+                0x51 => {
+                    if data[2] != 0x03 {
+                        return Err("Invalid End of Track meta event".to_string());
+                    }
+
+                    let mut tempo_bytes: Vec<u8> = vec![0x00];
+                    tempo_bytes.extend_from_slice(&data[3..=5]);
+                    let tempo = u32::from_be_bytes(
+                        tempo_bytes
+                            .try_into()
+                            .map_err(|_| "Invalid tempo bytes".to_string())?,
+                    );
+
+                    MetaEvent::SetTempo(tempo)
+                }
+                0x54 => {
+                    if data[2] != 0x05 {
+                        return Err("Invalid SMPTE Offset meta event".to_string());
+                    }
+
+                    let hour = data[3];
+                    let minute = data[4];
+                    let second = data[5];
+                    let frame = data[6];
+                    let sub_frame = data[7];
+
+                    // FIXME: add validation for SMPTE offset values
+
+                    MetaEvent::SmpteOffset {
+                        hour,
+                        minute,
+                        second,
+                        frame,
+                        sub_frame,
+                    }
+                }
+                0x58 => {
+                    if data[2] != 0x04 {
+                        return Err("Invalid SMPTE Offset meta event".to_string());
+                    }
+
+                    let numerator = data[3];
+                    let denominator = data[4];
+                    let clocks_per_click = data[5];
+                    let notated_32nd_notes_per_quarter_note = data[6];
+
+                    // FIXME: add validation for time signature values
+                    if notated_32nd_notes_per_quarter_note != 8 {
+                        eprintln!(
+                            "Warning: Notated 32nd notes per quarter note is not 8, got {}",
+                            notated_32nd_notes_per_quarter_note
+                        );
+                    }
+
+                    MetaEvent::TimeSignature {
+                        numerator,
+                        denominator,
+                        clocks_per_click,
+                        notated_32nd_notes_per_quarter_note,
+                    }
+                }
+                0x59 => {
+                    if data[2] != 0x02 {
+                        return Err("Invalid SMPTE Offset meta event".to_string());
+                    }
+
+                    let key = data[3] as i8;
+
+                    if key < -7 || key > 7 {
+                        return Err("Key signature must be between -7 and 7".to_string());
+                    }
+
+                    let scale = match data[4] {
+                        0 => MusicalScale::Major,
+                        1 => MusicalScale::Minor,
+                        _ => return Err("Invalid key signature scale".to_string()),
+                    };
+
+                    MetaEvent::KeySignature { key, scale }
+                }
+                0x7F => {
+                    let var_length = get_var_length_bytes_length(&data[2..])?;
+                    let length = from_var_length_bytes(&data[2..2 + var_length])? as usize;
+
+                    MetaEvent::SequencerSpecific(
+                        data[2 + var_length..2 + var_length + length].to_vec(),
+                    )
+                }
+                _ => return Err("Unsupported meta event type".to_string()),
+            });
+            Ok((event, 0))
         }
         // SysEx event
         0xF0 | 0xF7 => Ok((Event::SysExEvent, 0)),
