@@ -139,8 +139,8 @@ function handleMouseLeave(key: number) {
                     @mouseup.left="handleMouseUp(49)" @mouseleave="handleMouseLeave(49)"
                     class="absolute top-0 left-[14px]">
                 </BlackKey>
-                <WhiteKey @mousedown.left="handleMouseDown(40)" @mouseenter="handleMouseEnter(40)"
-                    @mouseup.left="handleMouseUp(40)" @mouseleave="handleMouseLeave(40)"></WhiteKey>
+                <WhiteKey @mousedown.left="handleMouseDown(50)" @mouseenter="handleMouseEnter(50)"
+                    @mouseup.left="handleMouseUp(50)" @mouseleave="handleMouseLeave(50)"></WhiteKey>
                 <BlackKey @mousedown.left="handleMouseDown(51)" @mouseenter="handleMouseEnter(51)"
                     @mouseup.left="handleMouseUp(51)" @mouseleave="handleMouseLeave(51)"
                     class="absolute top-0 left-[42px]">
