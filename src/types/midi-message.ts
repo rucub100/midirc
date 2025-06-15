@@ -1,3 +1,5 @@
+import { Midi } from "./midi";
+
 export type MidiChannel =
   | "channel1"
   | "channel2"
@@ -71,6 +73,16 @@ export type SystemMessage =
   | { realTime: SystemRealTimeMessage }
   | { exclusive: SystemExclusiveMessage };
 
-export type MidiMessage =
-  | { channel: { channel: MidiChannel; message: ChannelMessage } }
-  | { system: SystemMessage };
+export type MidiChannelMessage = {
+  channel: { channel: MidiChannel; message: ChannelMessage };
+};
+
+export type MidiSystemMessage = { system: SystemMessage };
+
+export type MidiMessage = MidiChannelMessage | MidiSystemMessage;
+
+export function isMidiChannelMessage(
+  message: MidiMessage
+): message is MidiChannelMessage {
+  return "channel" in message;
+}

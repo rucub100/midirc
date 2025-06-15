@@ -1,4 +1,4 @@
-import { ref } from "vue";
+import { onUnmounted, ref } from "vue";
 import { Midi } from "../types/midi";
 import {
   connectMidiInput,
@@ -20,12 +20,12 @@ const defaultMidi = {
 
 const globalMidi = ref<Midi>(defaultMidi);
 
+const onMessageCallbacks: ((msg: MidiMessage) => void)[] = [];
+
 registerMidiChannel()
   .then((channel) => {
     channel.onmessage = (msg) => {
-      console.log("Received MIDI message:", msg);
-      // TODO: Here you can handle the MIDI message as needed
-      // For example, you could update the globalMidi state or trigger some action
+      onMessageCallbacks.forEach((callback) => callback(msg));
     };
   })
   .catch((error) => {
@@ -124,6 +124,28 @@ function sendMessage(midiMessage: MidiMessage) {
 }
 
 export function useMidi() {
+  const onMessageCallback = ref<((msg: MidiMessage) => void) | null>(null);
+
+  function _remoteOnMessageCallback() {
+    if (onMessageCallback.value) {
+      const index = onMessageCallbacks.indexOf(onMessageCallback.value);
+      if (index !== -1) {
+        onMessageCallbacks.splice(index, 1);
+      }
+      onMessageCallback.value = null;
+    }
+  }
+
+  function onMessage(callback: (msg: MidiMessage) => void) {
+    _remoteOnMessageCallback();
+    onMessageCallback.value = callback;
+    onMessageCallbacks.push(callback);
+  }
+
+  onUnmounted(() => {
+    _remoteOnMessageCallback();
+  });
+
   return {
     midi: globalMidi,
     scanInput,
@@ -133,5 +155,6 @@ export function useMidi() {
     disconnectInput,
     disconnectOutput,
     sendMessage,
+    onMessage,
   };
 }
