@@ -70,20 +70,21 @@ pub async fn disconnect_midi_output<'a>(
 }
 
 #[tauri::command]
-pub async fn play_midi_demo<'a>(state: tauri::State<'a, MidiState>) -> Result<(), String> {
-    let midi = state.lock().unwrap();
-    // TODO for now there is just one demo but later we can have a parameter to select a particular example
-    // TODO return midi instead and later some async status update (e.g. via event)
-    // check if channel feature of tauri makes sense here
-    midi.play_demo()
-}
-
-#[tauri::command]
 pub async fn register_midi_channel<'a>(
     state: tauri::State<'a, MidiState>,
     channel: Channel<MidiMessage>,
 ) -> Result<(), String> {
     let mut midi = state.lock().unwrap();
     midi.set_frontend_channel(channel);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn send_midi_message<'a>(
+    state: tauri::State<'a, MidiState>,
+    midi_message: MidiMessage,
+) -> Result<(), String> {
+    let midi = state.lock().unwrap();
+    midi.send_message(midi_message)?;
     Ok(())
 }

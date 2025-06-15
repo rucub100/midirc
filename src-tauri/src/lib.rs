@@ -8,7 +8,7 @@ use midi::{
     MidiState,
 };
 
-use crate::midi::commands::{play_midi_demo, register_midi_channel};
+use crate::midi::commands::{register_midi_channel, send_midi_message};
 
 mod frontend;
 mod midi;
@@ -26,8 +26,8 @@ pub fn run() {
             connect_midi_output,
             disconnect_midi_input,
             disconnect_midi_output,
-            play_midi_demo,
-            register_midi_channel
+            register_midi_channel,
+            send_midi_message
         ])
         .setup(|app| {
             #[cfg(debug_assertions)] // only include this code on debug builds

@@ -86,6 +86,7 @@ impl MidiStateInner {
 
     pub fn disconnect_input(&mut self) {
         self.input_connection = None;
+        self.buffer.lock().unwrap().clear();
     }
 
     pub fn connect_input(&mut self, index: usize) -> Result<(), String> {
@@ -189,33 +190,20 @@ impl MidiStateInner {
         Ok(())
     }
 
-    pub fn play_demo(&self) -> Result<(), String> {
+    pub fn send_message(&self, message: MidiMessage) -> Result<(), String> {
         if self.output_connection.is_none() {
             return Err(
                 "No output connection established. Connect to an output port first.".to_string(),
             );
         }
 
-        let connection = &self.output_connection.as_ref().unwrap()._connection;
-        let connection = Arc::clone(connection);
+        let data: Vec<u8> = message.into();
 
-        // FIXME: use e.g. thread-priority crate to provide safe and unified thread priority management
-        // For this use case of music playback, we want the highest, most deterministic priority.
-        // This usually corresponds to a "real-time" or "time-critical" scheduling policy.
-        // Another important craete would be spin_sleep to compensate the jittering of the thread sleep
-        thread::spawn(move || {
-            let middle_c_on: Vec<u8> = MidiMessage::note_on(MidiChannel::Channel1, 60, 64)
-                .unwrap()
-                .into();
-            let middle_c_off: Vec<u8> = MidiMessage::note_off(MidiChannel::Channel1, 60, 0)
-                .unwrap()
-                .into();
-            let mut connection = connection.lock().unwrap();
-            (*connection).send(&middle_c_on).unwrap();
-            thread::sleep(std::time::Duration::from_secs(1));
-            (*connection).send(&middle_c_off).unwrap();
-        });
-
+        let connection = self.output_connection.as_ref().unwrap()._connection.clone();
+        let mut connection = connection.lock().unwrap();
+        connection
+            .send(data.as_slice())
+            .map_err(|e| format!("Failed to send MIDI message: {}", e))?;
         Ok(())
     }
 

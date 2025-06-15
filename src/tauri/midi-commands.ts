@@ -10,8 +10,8 @@ const COMMAND = {
   CONNECT_MIDI_OUTPUT: "connect_midi_output",
   DISCONNECT_MIDI_INPUT: "disconnect_midi_input",
   DISCONNECT_MIDI_OUTPUT: "disconnect_midi_output",
-  PLAY_MIDI_DEMO: "play_midi_demo",
   REGISTER_MIDI_CHANNEL: "register_midi_channel",
+  SEND_MIDI_MESSAGE: "send_midi_message",
 } as const;
 
 export async function getMidi() {
@@ -42,8 +42,8 @@ export async function disconnectMidiOutput() {
   return invoke<Midi>(COMMAND.DISCONNECT_MIDI_OUTPUT);
 }
 
-export async function playMidiDemo() {
-  return invoke<void>(COMMAND.PLAY_MIDI_DEMO);
+export async function sendMidiMessage(midiMessage: MidiMessage) {
+  return invoke<void>(COMMAND.SEND_MIDI_MESSAGE, { midiMessage });
 }
 
 export async function registerMidiChannel(): Promise<Channel<MidiMessage>> {

@@ -6,11 +6,12 @@ import {
   disconnectMidiInput,
   disconnectMidiOutput,
   getMidi,
-  playMidiDemo,
   registerMidiChannel,
   scanMidiInput,
   scanMidiOutput,
+  sendMidiMessage,
 } from "../tauri/midi-commands";
+import { MidiMessage } from "../types/midi-message";
 
 const defaultMidi = {
   availableInputPorts: [],
@@ -112,9 +113,14 @@ function disconnectOutput() {
     });
 }
 
-function playDemo() {
-  // TODO result and error handling
-  playMidiDemo();
+function sendMessage(midiMessage: MidiMessage) {
+  sendMidiMessage(midiMessage)
+    .then(() => {
+      console.log("MIDI message sent:", midiMessage);
+    })
+    .catch((error) => {
+      console.error("Error sending MIDI message:", error);
+    });
 }
 
 export function useMidi() {
@@ -126,6 +132,6 @@ export function useMidi() {
     connectOutput,
     disconnectInput,
     disconnectOutput,
-    playDemo,
+    sendMessage,
   };
 }
