@@ -720,14 +720,162 @@ impl TryFrom<&MidiFile> for Vec<u8> {
             data.extend_from_slice(MIDI_TRACK_CHUNK_ASCII_TYPE);
             let mut track_data: Vec<u8> = Vec::new();
 
+            let mut end_of_track = false;
+            let mut running_status: Option<u8> = None;
             for event in track {
+                if end_of_track {
+                    return Err("Track contains events after End of Track".to_string());
+                }
+
                 let delta_bytes = to_var_length_bytes(event.delta_time)?;
                 track_data.extend(delta_bytes);
 
-                // TODO: event to bytes
-                // make sure to handle running status for MIDI events
-                // ignore SysEx events for now
-                // add support for meta events
+                match &event.event {
+                    Event::SysExEvent => {
+                        // SysEx events are not supported
+                        continue;
+                    }
+                    Event::MetaEvent(meta_event) => {
+                        running_status = None;
+
+                        track_data.push(0xFF);
+                        match meta_event {
+                            MetaEvent::SequenceNumber(seq_num) => {
+                                track_data.push(0x00);
+                                track_data.push(0x02);
+                                track_data.extend_from_slice(&seq_num.to_be_bytes());
+                            }
+                            MetaEvent::TextEvent(text) => {
+                                track_data.push(0x01);
+                                let var_length_bytes = to_var_length_bytes(text.len() as u32)?;
+                                track_data.extend(var_length_bytes);
+                                track_data.extend(text.as_bytes());
+                            }
+                            MetaEvent::CopyrightNotice(text) => {
+                                track_data.push(0x02);
+                                let var_length_bytes = to_var_length_bytes(text.len() as u32)?;
+                                track_data.extend(var_length_bytes);
+                                track_data.extend(text.as_bytes());
+                            }
+                            MetaEvent::SequenceName(text) | MetaEvent::TrackName(text) => {
+                                track_data.push(0x03);
+                                let var_length_bytes = to_var_length_bytes(text.len() as u32)?;
+                                track_data.extend(var_length_bytes);
+                                track_data.extend(text.as_bytes());
+                            }
+                            MetaEvent::InstrumentName(text) => {
+                                track_data.push(0x04);
+                                let var_length_bytes = to_var_length_bytes(text.len() as u32)?;
+                                track_data.extend(var_length_bytes);
+                                track_data.extend(text.as_bytes());
+                            }
+                            MetaEvent::Lyric(text) => {
+                                track_data.push(0x05);
+                                let var_length_bytes = to_var_length_bytes(text.len() as u32)?;
+                                track_data.extend(var_length_bytes);
+                                track_data.extend(text.as_bytes());
+                            }
+                            MetaEvent::Marker(text) => {
+                                track_data.push(0x06);
+                                let var_length_bytes = to_var_length_bytes(text.len() as u32)?;
+                                track_data.extend(var_length_bytes);
+                                track_data.extend(text.as_bytes());
+                            }
+                            MetaEvent::CuePoint(text) => {
+                                track_data.push(0x07);
+                                let var_length_bytes = to_var_length_bytes(text.len() as u32)?;
+                                track_data.extend(var_length_bytes);
+                                track_data.extend(text.as_bytes());
+                            }
+                            MetaEvent::MidiChannelPrefix(channel) => {
+                                track_data.push(0x20);
+                                track_data.push(0x01);
+                                track_data.push((*channel).into());
+                            }
+                            MetaEvent::EndOfTrack => {
+                                track_data.push(0x2F);
+                                track_data.push(0x00);
+                                end_of_track = true;
+                            }
+                            MetaEvent::SetTempo(tempo) => {
+                                track_data.push(0x51);
+                                track_data.push(0x03);
+                                let tempo_bytes: [u8; 4] = tempo.to_be_bytes();
+                                track_data.push(tempo_bytes[1]);
+                                track_data.push(tempo_bytes[2]);
+                                track_data.push(tempo_bytes[3]);
+                            }
+                            MetaEvent::SmpteOffset {
+                                hour,
+                                minute,
+                                second,
+                                frame,
+                                sub_frame,
+                            } => {
+                                track_data.push(0x54);
+                                track_data.push(0x05);
+                                track_data.push(*hour);
+                                track_data.push(*minute);
+                                track_data.push(*second);
+                                track_data.push(*frame);
+                                track_data.push(*sub_frame);
+                            }
+                            MetaEvent::TimeSignature {
+                                numerator,
+                                denominator,
+                                clocks_per_click,
+                                notated_32nd_notes_per_quarter_note,
+                            } => {
+                                track_data.push(0x58);
+                                track_data.push(0x04);
+                                track_data.push(*numerator);
+                                track_data.push(*denominator);
+                                track_data.push(*clocks_per_click);
+                                track_data.push(*notated_32nd_notes_per_quarter_note);
+                            }
+                            MetaEvent::KeySignature { key, scale } => {
+                                track_data.push(0x59);
+                                track_data.push(0x02);
+                                track_data.push(*key as u8);
+                                track_data.push(match scale {
+                                    MusicalScale::Major => 0x00,
+                                    MusicalScale::Minor => 0x01,
+                                });
+                            }
+                            MetaEvent::SequencerSpecific(data) => {
+                                track_data.push(0x7F);
+                                let var_length_bytes = to_var_length_bytes(data.len() as u32)?;
+                                track_data.extend(var_length_bytes);
+                                track_data.extend(data);
+                            }
+                        }
+                    }
+                    Event::MidiEvent(midi_event) => {
+                        if matches!(
+                            midi_event,
+                            MidiMessage::Channel {
+                                channel: _,
+                                message: _,
+                            }
+                        ) {
+                            let midi_bytes: Vec<u8> = midi_event.to_owned().into();
+                            let new_status = midi_bytes[0];
+
+                            if running_status.is_some() && running_status.unwrap() == new_status {
+                                track_data.extend(&midi_bytes[1..]);
+                            } else {
+                                track_data.extend(&midi_bytes);
+                                running_status = Some(new_status);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !end_of_track {
+                track_data.push(0xFF);
+                track_data.push(0x2F);
+                track_data.push(0x00);
             }
 
             data.extend_from_slice(&(track_data.len() as u32).to_be_bytes());
@@ -740,42 +888,149 @@ impl TryFrom<&MidiFile> for Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    use crate::midi::message::{ChannelMessage, ChannelVoiceMessage};
+
     use super::*;
+
+    const MIDI_FORMAT_0_EXAMPLE: &[u8] = &[
+        0x4D, 0x54, 0x68, 0x64, // MThd
+        0x00, 0x00, 0x00, 0x06, // chunk length
+        0x00, 0x00, // format 0
+        0x00, 0x01, // one track
+        0x00, 0x60, // division: 96 ticks per quarter note
+        0x4D, 0x54, 0x72, 0x6B, // MTrk
+        0x00, 0x00, 0x00, 0x3B, // chunk length
+        0x00, 0xFF, 0x58, 0x04, 0x04, 0x02, 0x18,
+        0x08, // time signature: 4/4, 24 clocks per click, 8 notated 32nd notes per quarter note
+        0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1,
+        0x20, // set tempo: 500000 microseconds per quarter note = 120 BPM
+        0x00, 0xC0, 0x05, // program change: channel 0, program 5
+        0x00, 0xC1, 0x2E, // program change: channel 1, program 46
+        0x00, 0xC2, 0x46, // program change: channel 2, program 70
+        0x00, 0x92, 0x30, 0x60, // note on: channel 2, note 48, velocity 96
+        0x00, 0x3C, 0x60, // note on: channel 2, note 60, velocity 96 (running status)
+        0x60, 0x91, 0x43, 0x40, // ...
+        0x60, 0x90, 0x4C, 0x20, // ...
+        0x81, 0x40, 0x82, 0x30, 0x40, // ...
+        0x00, 0x3C, 0x40, // ...
+        0x00, 0x81, 0x43, 0x40, // ...
+        0x00, 0x80, 0x4C, 0x40, // ...
+        0x00, 0xFF, 0x2F, 0x00, // end of track
+    ];
+
+    #[test]
+    fn serialize_midi_file() {
+        let midi_file = MidiFile {
+            header: MidiHeader {
+                format: MidiFormat::SingleMultiChannelTrack,
+                num_tracks: 1,
+                division: MidiDivision::TicksPerQuarterNote(96),
+            },
+            tracks: vec![vec![
+                MidiTrackEvent {
+                    delta_time: 0,
+                    event: Event::MetaEvent(MetaEvent::TimeSignature {
+                        numerator: 4,
+                        denominator: 2,
+                        clocks_per_click: 24,
+                        notated_32nd_notes_per_quarter_note: 8,
+                    }),
+                },
+                MidiTrackEvent {
+                    delta_time: 0,
+                    event: Event::MetaEvent(MetaEvent::SetTempo(500_000)),
+                },
+                MidiTrackEvent {
+                    delta_time: 0,
+                    event: Event::MidiEvent(MidiMessage::Channel {
+                        channel: MidiChannel::Channel1,
+                        message: ChannelMessage::Voice(ChannelVoiceMessage::ProgramChange(5)),
+                    }),
+                },
+                MidiTrackEvent {
+                    delta_time: 0,
+                    event: Event::MidiEvent(MidiMessage::Channel {
+                        channel: MidiChannel::Channel2,
+                        message: ChannelMessage::Voice(ChannelVoiceMessage::ProgramChange(46)),
+                    }),
+                },
+                MidiTrackEvent {
+                    delta_time: 0,
+                    event: Event::MidiEvent(MidiMessage::Channel {
+                        channel: MidiChannel::Channel3,
+                        message: ChannelMessage::Voice(ChannelVoiceMessage::ProgramChange(70)),
+                    }),
+                },
+                MidiTrackEvent {
+                    delta_time: 0,
+                    event: Event::MidiEvent(
+                        MidiMessage::note_on(MidiChannel::Channel3, 48, 96).unwrap(),
+                    ),
+                },
+                MidiTrackEvent {
+                    delta_time: 0,
+                    event: Event::MidiEvent(
+                        MidiMessage::note_on(MidiChannel::Channel3, 60, 96).unwrap(),
+                    ),
+                },
+                MidiTrackEvent {
+                    delta_time: 96,
+                    event: Event::MidiEvent(
+                        MidiMessage::note_on(MidiChannel::Channel2, 67, 64).unwrap(),
+                    ),
+                },
+                MidiTrackEvent {
+                    delta_time: 96,
+                    event: Event::MidiEvent(
+                        MidiMessage::note_on(MidiChannel::Channel1, 76, 32).unwrap(),
+                    ),
+                },
+                MidiTrackEvent {
+                    delta_time: 192,
+                    event: Event::MidiEvent(
+                        MidiMessage::note_off(MidiChannel::Channel3, 48, 64).unwrap(),
+                    ),
+                },
+                MidiTrackEvent {
+                    delta_time: 0,
+                    event: Event::MidiEvent(
+                        MidiMessage::note_off(MidiChannel::Channel3, 60, 64).unwrap(),
+                    ),
+                },
+                MidiTrackEvent {
+                    delta_time: 0,
+                    event: Event::MidiEvent(
+                        MidiMessage::note_off(MidiChannel::Channel2, 67, 64).unwrap(),
+                    ),
+                },
+                MidiTrackEvent {
+                    delta_time: 0,
+                    event: Event::MidiEvent(
+                        MidiMessage::note_off(MidiChannel::Channel1, 76, 64).unwrap(),
+                    ),
+                },
+                MidiTrackEvent {
+                    delta_time: 0,
+                    event: Event::MetaEvent(MetaEvent::EndOfTrack),
+                },
+            ]],
+        };
+
+        let serialized = Vec::try_from(&midi_file).unwrap();
+
+        assert_eq!(serialized, MIDI_FORMAT_0_EXAMPLE);
+    }
 
     #[test]
     fn parse_midi_file() {
-        let midi_data: &[u8] = &[
-            0x4D, 0x54, 0x68, 0x64, // MThd
-            0x00, 0x00, 0x00, 0x06, // chunk length
-            0x00, 0x00, // format 0
-            0x00, 0x01, // one track
-            0x00, 0x60, // division: 96 ticks per quarter note
-            0x4D, 0x54, 0x72, 0x6B, // MTrk
-            0x00, 0x00, 0x00, 0x3B, // chunk length
-            0x00, 0xFF, 0x58, 0x04, 0x04, 0x02, 0x18,
-            0x08, // time signature: 4/4, 24 clocks per click, 8 notated 32nd notes per quarter note
-            0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1,
-            0x20, // set tempo: 500000 microseconds per quarter note = 120 BPM
-            0x00, 0xC0, 0x05, // program change: channel 0, program 5
-            0x00, 0xC1, 0x2E, // program change: channel 1, program 46
-            0x00, 0xC2, 0x46, // program change: channel 2, program 70
-            0x00, 0x92, 0x30, 0x60, // note on: channel 2, note 48, velocity 96
-            0x00, 0x3C, 0x60, // note on: channel 2, note 60, velocity 96 (running status)
-            0x60, 0x91, 0x43, 0x40, // ...
-            0x60, 0x90, 0x4C, 0x20, // ...
-            0x81, 0x40, 0x82, 0x30, 0x40, // ...
-            0x00, 0x3C, 0x40, // ...
-            0x00, 0x81, 0x43, 0x40, // ...
-            0x00, 0x80, 0x4C, 0x40, // ...
-            0x00, 0xFF, 0x2F, 0x00, // end of track
-        ];
-
-        let midi_file = MidiFile::try_from(midi_data);
-
-        if midi_file.is_err() {
-            eprintln!("Failed to parse MIDI file: {:?}", midi_file.err());
-            assert!(false, "MIDI file parsing failed");
-        }
+        let midi_file = MidiFile::try_from(MIDI_FORMAT_0_EXAMPLE).unwrap();
+        assert_eq!(midi_file.header.format, MidiFormat::SingleMultiChannelTrack);
+        assert_eq!(midi_file.header.num_tracks, 1);
+        assert_eq!(
+            midi_file.header.division,
+            MidiDivision::TicksPerQuarterNote(96)
+        );
+        assert_eq!(midi_file.tracks.len(), 1);
     }
 
     #[test]
