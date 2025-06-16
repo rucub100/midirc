@@ -1,14 +1,9 @@
-use std::{
-    collections::VecDeque,
-    sync::{Arc, Mutex},
-    thread,
-    time::Instant,
-};
+use std::sync::{Arc, Mutex};
 
 use midir::MidiInput;
 use tauri::ipc::Channel;
 
-use crate::midi::message::{MidiMessage, TimeStampedMidiMessage};
+use crate::midi::message::MidiMessage;
 
 pub mod commands;
 pub mod message;
@@ -43,7 +38,6 @@ pub struct MidiStateInner {
     pub input_connection: Option<MidiInputConnection>,
     pub output_connection: Option<MidiOutputConnection>,
     pub frontend_channel: Arc<Mutex<Option<Channel<MidiMessage>>>>,
-    pub buffer: Arc<Mutex<VecDeque<TimeStampedMidiMessage>>>,
 }
 
 impl MidiStateInner {
@@ -86,7 +80,6 @@ impl MidiStateInner {
 
     pub fn disconnect_input(&mut self) {
         self.input_connection = None;
-        self.buffer.lock().unwrap().clear();
     }
 
     pub fn connect_input(&mut self, index: usize) -> Result<(), String> {
@@ -108,15 +101,12 @@ impl MidiStateInner {
         let midi_port =
             midi_port.ok_or_else(|| format!("Input port not found: {}", port.name.as_str()))?;
 
-        let buffer = self.buffer.clone();
         let frontend_channel = self.frontend_channel.clone();
         let connection = input
             .connect(
                 &midi_port,
                 port.name.as_str(),
                 move |_, message, _| {
-                    let timestamp = Instant::now();
-
                     let midi_message_result: Result<MidiMessage, String> = message.try_into();
                     let message = match midi_message_result {
                         Ok(msg) => msg,
@@ -125,17 +115,6 @@ impl MidiStateInner {
                             return;
                         }
                     };
-
-                    let mut buffer = buffer.lock().unwrap();
-                    buffer.push_back(TimeStampedMidiMessage {
-                        message: message.clone(),
-                        timestamp,
-                    });
-
-                    if buffer.len() > 1_000_000 {
-                        eprintln!("MIDI buffer overflow!!!");
-                        buffer.pop_front();
-                    }
 
                     let frontend_channel = frontend_channel.lock().unwrap();
                     if let Some(ref ch) = *frontend_channel {
