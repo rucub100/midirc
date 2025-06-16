@@ -7,6 +7,7 @@ use crate::midi::message::MidiMessage;
 
 pub mod commands;
 pub mod message;
+pub mod recorder;
 pub mod smf;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -116,6 +117,7 @@ impl MidiStateInner {
                         }
                     };
 
+                    // FIXME: introduce debounce mechanism to avoid flooding the frontend
                     let frontend_channel = frontend_channel.lock().unwrap();
                     if let Some(ref ch) = *frontend_channel {
                         ch.send(message).unwrap_or_else(|e| {

@@ -790,7 +790,7 @@ impl TryFrom<&MidiFile> for Vec<u8> {
                             MetaEvent::MidiChannelPrefix(channel) => {
                                 track_data.push(0x20);
                                 track_data.push(0x01);
-                                track_data.push((*channel).into());
+                                track_data.push((*channel).clone().into());
                             }
                             MetaEvent::EndOfTrack => {
                                 track_data.push(0x2F);
@@ -851,6 +851,7 @@ impl TryFrom<&MidiFile> for Vec<u8> {
                         }
                     }
                     Event::MidiEvent(midi_event) => {
+                        // FIXME: refactor all matches! to use `if let` or `match` with guards
                         if matches!(
                             midi_event,
                             MidiMessage::Channel {
