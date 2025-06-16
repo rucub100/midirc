@@ -1,19 +1,20 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import MidiMonitor from '../views/MidiMonitor.vue';
 import ViewNavigation from './ViewNavigation.vue';
+import MidiMonitor from "../views/MidiMonitor.vue";
+import MidiRecorder from "../views/MidiRecorder.vue";
+import { useNavigation, View } from '../hooks/use-navigation';
 
-const views = [MidiMonitor];
-
-const currentViewIndex = ref(0);
-const currentView = computed(() => (views[currentViewIndex.value]));
-
+const { currentView, navigateTo } = useNavigation();
+const views: Record<View, any> = {
+    'setup': MidiMonitor,
+    'recorder': MidiRecorder,
+};
 </script>
 
 <template>
     <div class="flex flex-row h-full w-full">
-        <ViewNavigation></ViewNavigation>
+        <ViewNavigation @navigate="navigateTo"></ViewNavigation>
         <div class="h-full w-[1px] bg-[var(--color-hover)]"></div>
-        <component :is="currentView" class="overflow-hidden relative" />
+        <component :is="views[currentView]" class="overflow-hidden relative" />
     </div>
 </template>

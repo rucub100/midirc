@@ -20,7 +20,7 @@ onMessage((event) => {
 </script>
 
 <template>
-    <div class="w-full flex flex-col p-4 gap-4 relative">
+    <div class="w-full h-full flex flex-col p-4 gap-4 relative">
         <h1>First, connect to your digital instrument</h1>
         <div class="flex flex-row items-center gap-4">
             <MidiInputSelector></MidiInputSelector>
