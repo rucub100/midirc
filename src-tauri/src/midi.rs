@@ -8,7 +8,7 @@ use std::{
 use midir::MidiInput;
 use tauri::ipc::Channel;
 
-use crate::midi::message::{MidiChannel, MidiMessage, TimeStampedMidiMessage};
+use crate::midi::message::{MidiMessage, TimeStampedMidiMessage};
 
 pub mod commands;
 pub mod message;
@@ -42,7 +42,7 @@ pub struct MidiStateInner {
     pub available_output_ports: Vec<MidiOutputPort>,
     pub input_connection: Option<MidiInputConnection>,
     pub output_connection: Option<MidiOutputConnection>,
-    pub frontend_channel: Option<Channel<MidiMessage>>,
+    pub frontend_channel: Arc<Mutex<Option<Channel<MidiMessage>>>>,
     pub buffer: Arc<Mutex<VecDeque<TimeStampedMidiMessage>>>,
 }
 
@@ -137,7 +137,8 @@ impl MidiStateInner {
                         buffer.pop_front();
                     }
 
-                    if let Some(ref ch) = frontend_channel.as_ref() {
+                    let frontend_channel = frontend_channel.lock().unwrap();
+                    if let Some(ref ch) = *frontend_channel {
                         ch.send(message).unwrap_or_else(|e| {
                             eprintln!("Failed to send MIDI message to frontend: {}", e);
                         });
@@ -208,7 +209,8 @@ impl MidiStateInner {
     }
 
     pub fn set_frontend_channel(&mut self, channel: Channel<MidiMessage>) {
-        self.frontend_channel = Some(channel);
+        let mut frontend_channel = self.frontend_channel.lock().unwrap();
+        *frontend_channel = Some(channel);
     }
 }
 
