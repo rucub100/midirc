@@ -4,11 +4,21 @@ import WhiteKey from './WhiteKey.vue';
 import { useMidi } from '../../hooks/use-midi';
 import { MidiMessage } from '../../types/midi-message';
 import { useMouse } from '../../hooks/use-mouse';
+import { PropType } from 'vue';
+
+const props = defineProps({
+    disabled: {
+        type: Boolean as PropType<boolean>,
+        default: false,
+    },
+});
 
 const { sendMessage } = useMidi();
 const { isLeftMouseDown } = useMouse();
 
 function handleMouseDown(key: number) {
+    if (props.disabled) return;
+
     sendMessage({
         channel: {
             channel: "channel1",
@@ -31,6 +41,8 @@ function handleMouseEnter(key: number) {
 }
 
 function handleMouseUp(key: number) {
+    if (props.disabled) return;
+
     sendMessage({
         channel: {
             channel: "channel1",
@@ -54,9 +66,10 @@ function handleMouseLeave(key: number) {
 </script>
 
 <template>
-    <div class="flex flex-col w-max max-w-full overflow-x-hidden relative">
+    <div class="flex flex-col w-max max-w-full overflow-x-hidden relative"
+        :class="{ 'pointer-events-none': disabled, 'mix-blend-overlay': disabled }">
         <div class="w-full h-[2px] bg-red-800/75"></div>
-        <div class="flex flex-row overflow-x-auto">
+        <div class="flex flex-row overflow-x-auto" :class="{ 'pointer-events-none': disabled }">
             <!-- Sub-contra octave -->
             <div class="flex flex-row relative">
                 <WhiteKey @mousedown.left="handleMouseDown(21)" @mouseenter="handleMouseEnter(21)"
