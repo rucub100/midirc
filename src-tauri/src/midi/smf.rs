@@ -851,14 +851,7 @@ impl TryFrom<&MidiFile> for Vec<u8> {
                         }
                     }
                     Event::MidiEvent(midi_event) => {
-                        // FIXME: refactor all matches! to use `if let` or `match` with guards
-                        if matches!(
-                            midi_event,
-                            MidiMessage::Channel {
-                                channel: _,
-                                message: _,
-                            }
-                        ) {
+                        if let MidiMessage::Channel { .. } = midi_event {
                             let midi_bytes: Vec<u8> = midi_event.to_owned().into();
                             let new_status = midi_bytes[0];
 
