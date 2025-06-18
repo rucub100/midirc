@@ -9,8 +9,8 @@ use midi::{
 };
 
 use crate::midi::commands::{
-    get_midi_recorder, pause_midi_recording, register_midi_channel, resume_midi_recording,
-    send_midi_message, start_midi_recording, stop_midi_recording,
+    get_midi_recorder, register_midi_channel, send_midi_message, start_midi_recording,
+    stop_midi_recording,
 };
 
 mod frontend;
@@ -33,8 +33,6 @@ pub fn run() {
             send_midi_message,
             get_midi_recorder,
             start_midi_recording,
-            pause_midi_recording,
-            resume_midi_recording,
             stop_midi_recording
         ])
         .setup(|app| {

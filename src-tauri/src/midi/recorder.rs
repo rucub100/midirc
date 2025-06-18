@@ -1,28 +1,24 @@
-use std::{
-    collections::VecDeque,
-    time::{Duration, Instant},
-};
-
 use crate::midi::message::{MidiMessage, TimeStampedMidiMessage};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RecorderState {
     Stopped,
-    Recording { start: Instant },
-    Paused { elapsed: Duration },
+    Recording,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct MidiRecorder {
     state: RecorderState,
-    buffer: VecDeque<TimeStampedMidiMessage>,
+    buffer: Vec<TimeStampedMidiMessage>,
+    recordings: Vec<Vec<TimeStampedMidiMessage>>,
 }
 
 impl Default for MidiRecorder {
     fn default() -> Self {
         Self {
             state: RecorderState::Stopped,
-            buffer: VecDeque::new(),
+            buffer: Vec::new(),
+            recordings: Vec::new(),
         }
     }
 }
@@ -33,55 +29,51 @@ impl MidiRecorder {
     }
 
     pub fn start_recording(&mut self) -> Result<(), String> {
-        if let RecorderState::Stopped = self.state {
+        if self.state == RecorderState::Stopped {
             self.buffer.clear();
-            self.state = RecorderState::Recording {
-                start: Instant::now(),
-            };
+            self.state = RecorderState::Recording;
             Ok(())
         } else {
-            Err("Recorder is already recording or paused".to_string())
-        }
-    }
-
-    pub fn pause_recording(&mut self) -> Result<(), String> {
-        if let RecorderState::Recording { start } = self.state {
-            self.state = RecorderState::Paused {
-                elapsed: start.elapsed(),
-            };
-            Ok(())
-        } else {
-            Err("Recorder is not currently recording".to_string())
-        }
-    }
-
-    pub fn resume_recording(&mut self) -> Result<(), String> {
-        if let RecorderState::Paused { elapsed } = self.state {
-            self.state = RecorderState::Recording {
-                start: Instant::now().checked_sub(elapsed).unwrap(),
-            };
-            Ok(())
-        } else {
-            Err("Recorder is not currently paused".to_string())
+            Err("Recorder is already recording".to_string())
         }
     }
 
     pub fn stop_recording(&mut self) -> Result<(), String> {
-        if let RecorderState::Stopped = self.state {
+        if self.state == RecorderState::Stopped {
             return Err("Recorder is not currently recording".to_string());
         }
+
         self.state = RecorderState::Stopped;
+
+        if !self.buffer.is_empty() {
+            self.recordings.push(self.buffer.clone());
+            self.buffer.clear();
+        }
+
         Ok(())
     }
 
-    pub fn add_message(&mut self, message: MidiMessage) -> Result<(), String> {
-        if let RecorderState::Recording { start } = self.state {
-            self.buffer.push_back(TimeStampedMidiMessage {
-                timestamp_microseconds: start
-                    .elapsed()
-                    .as_micros()
-                    .try_into()
-                    .map_err(|_| "Timestamp overflow")?,
+    pub fn get_recordings(&self) -> &[Vec<TimeStampedMidiMessage>] {
+        self.recordings.as_slice()
+    }
+
+    pub fn remove_recording(&mut self, index: usize) -> Result<(), String> {
+        if index < self.recordings.len() {
+            self.recordings.remove(index);
+            Ok(())
+        } else {
+            Err("Recording index out of bounds".to_string())
+        }
+    }
+
+    pub fn add_message(
+        &mut self,
+        message: MidiMessage,
+        timestamp_microseconds: u64,
+    ) -> Result<(), String> {
+        if self.state == RecorderState::Recording {
+            self.buffer.push(TimeStampedMidiMessage {
+                timestamp_microseconds,
                 message,
             });
             Ok(())

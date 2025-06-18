@@ -1,15 +1,20 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 
 use midir::MidiInput;
 use tauri::ipc::Channel;
 
 use crate::midi::{
     message::MidiMessage,
+    playback::MidiPlayback,
     recorder::{MidiRecorder, RecorderState},
 };
 
 pub mod commands;
 pub mod message;
+pub mod playback;
 pub mod recorder;
 pub mod smf;
 
@@ -42,6 +47,7 @@ pub struct MidiStateInner {
     pub input_connection: Option<MidiInputConnection>,
     pub output_connection: Option<MidiOutputConnection>,
     pub recorder: Arc<Mutex<MidiRecorder>>,
+    pub playback: Arc<Mutex<MidiPlayback>>,
     pub frontend_channel: Arc<Mutex<Option<Channel<MidiMessage>>>>,
 }
 
@@ -112,7 +118,7 @@ impl MidiStateInner {
             .connect(
                 &midi_port,
                 port.name.as_str(),
-                move |_, message, _| {
+                move |timestamp, message, _| {
                     let midi_message_result: Result<MidiMessage, String> = message.try_into();
                     let message = match midi_message_result {
                         Ok(msg) => msg,
@@ -124,9 +130,11 @@ impl MidiStateInner {
 
                     let mut recorder = recorder.lock().unwrap();
                     if let RecorderState::Recording { .. } = recorder.get_state() {
-                        recorder.add_message(message.clone()).unwrap_or_else(|e| {
-                            eprintln!("Failed to record MIDI message: {}", e);
-                        });
+                        recorder
+                            .add_message(message.clone(), timestamp)
+                            .unwrap_or_else(|e| {
+                                eprintln!("Failed to record MIDI message: {}", e);
+                            });
                     }
 
                     // FIXME: introduce debounce mechanism to avoid flooding the frontend
@@ -180,6 +188,15 @@ impl MidiStateInner {
             port: port.to_owned(),
             _connection: Arc::new(Mutex::new(connection)),
         });
+
+        let connection = self.output_connection.as_ref().unwrap()._connection.clone();
+        self.playback.lock().unwrap().set_player(move |msg| {
+            connection
+                .lock()
+                .unwrap()
+                .send(msg.as_slice())
+                .map_err(|e| format!("Failed to send MIDI message to output port: {}", e))
+        })?;
 
         Ok(())
     }

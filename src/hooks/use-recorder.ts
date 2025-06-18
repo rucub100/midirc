@@ -1,8 +1,6 @@
 import { ref } from "vue";
 import {
   getRecorder,
-  pauseMidiRecording,
-  resumeMidiRecording,
   startMidiRecording,
   stopMidiRecording,
 } from "../tauri/recorder-commands";
@@ -10,6 +8,7 @@ import { Recorder } from "../types/recorder";
 
 const defaultRecorder = {
   state: "stopped",
+  recordings: [],
 } satisfies Recorder;
 
 const globalRecorder = ref<Recorder>(defaultRecorder);
@@ -35,28 +34,6 @@ function startRecording() {
     });
 }
 
-function pauseRecording() {
-  pauseMidiRecording()
-    .then((recorder) => {
-      globalRecorder.value = recorder;
-    })
-    .catch((error) => {
-      console.error("Error pausing MIDI recording:", error);
-      globalRecorder.value = defaultRecorder;
-    });
-}
-
-function resumeRecording() {
-  resumeMidiRecording()
-    .then((recorder) => {
-      globalRecorder.value = recorder;
-    })
-    .catch((error) => {
-      console.error("Error resuming MIDI recording:", error);
-      globalRecorder.value = defaultRecorder;
-    });
-}
-
 function stopRecording() {
   console.log("Stopping MIDI recording...");
   stopMidiRecording()
@@ -74,8 +51,6 @@ export function useRecorder() {
   return {
     recorder: globalRecorder,
     startRecording,
-    pauseRecording,
-    resumeRecording,
     stopRecording,
   };
 }

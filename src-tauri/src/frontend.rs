@@ -68,23 +68,18 @@ pub enum RecorderState {
 #[serde(rename_all = "camelCase")]
 pub struct Recorder {
     pub state: RecorderState,
-    pub elapsed: Option<Duration>,
+    pub recordings: Vec<()>, // FIXME: Placeholder for when playback is implemented
 }
 
-impl From<&crate::midi::recorder::RecorderState> for Recorder {
-    fn from(value: &crate::midi::recorder::RecorderState) -> Self {
-        let (state, elapsed) = {
-            match value {
-                crate::midi::recorder::RecorderState::Stopped => (RecorderState::Stopped, None),
-                crate::midi::recorder::RecorderState::Recording { start } => {
-                    (RecorderState::Recording, Some(start.elapsed()))
-                }
-                crate::midi::recorder::RecorderState::Paused { elapsed } => {
-                    (RecorderState::Paused, Some(elapsed.clone()))
-                }
-            }
+impl From<&crate::midi::recorder::MidiRecorder> for Recorder {
+    fn from(value: &crate::midi::recorder::MidiRecorder) -> Self {
+        let state = match value.get_state() {
+            crate::midi::recorder::RecorderState::Stopped => RecorderState::Stopped,
+            crate::midi::recorder::RecorderState::Recording => RecorderState::Recording,
         };
 
-        Recorder { state, elapsed }
+        let recordings = value.get_recordings().iter().map(|_| ()).collect(); // FIXME: Placeholder for when playback is implemented
+
+        Recorder { state, recordings }
     }
 }

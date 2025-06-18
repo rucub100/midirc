@@ -18,5 +18,7 @@ const emit = defineEmits<{
         </IconButton>
         <!-- <IconButton icon="edit_audio" title="MIDI Editor" class="p-3" :active="currentView === 'editor'"
             @click="emit('navigate', 'editor')"></IconButton> -->
+        <!-- <IconButton icon="play_lesson" title="Lessons" class="p-3">
+        </IconButton> -->
     </div>
 </template>
