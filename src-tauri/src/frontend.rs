@@ -1,20 +1,22 @@
+use std::time::Duration;
+
 use crate::midi::MidiStateInner;
 
-#[derive(Default, Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MidiInputPort {
     pub id: String,
     pub name: String,
 }
 
-#[derive(Default, Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MidiOutputPort {
     pub id: String,
     pub name: String,
 }
 
-#[derive(Default, Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Midi {
     pub available_input_ports: Vec<MidiInputPort>,
@@ -51,5 +53,38 @@ impl From<&MidiStateInner> for Midi {
                 name: c.port.name.clone(),
             }),
         }
+    }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum RecorderState {
+    Stopped,
+    Recording,
+    Paused,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Recorder {
+    pub state: RecorderState,
+    pub elapsed: Option<Duration>,
+}
+
+impl From<&crate::midi::recorder::RecorderState> for Recorder {
+    fn from(value: &crate::midi::recorder::RecorderState) -> Self {
+        let (state, elapsed) = {
+            match value {
+                crate::midi::recorder::RecorderState::Stopped => (RecorderState::Stopped, None),
+                crate::midi::recorder::RecorderState::Recording { start } => {
+                    (RecorderState::Recording, Some(start.elapsed()))
+                }
+                crate::midi::recorder::RecorderState::Paused { elapsed } => {
+                    (RecorderState::Paused, Some(elapsed.clone()))
+                }
+            }
+        };
+
+        Recorder { state, elapsed }
     }
 }

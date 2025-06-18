@@ -1,7 +1,10 @@
 use tauri::ipc::Channel;
 
 use super::MidiState;
-use crate::{frontend::Midi, midi::message::MidiMessage};
+use crate::{
+    frontend::{Midi, Recorder},
+    midi::message::MidiMessage,
+};
 
 #[tauri::command]
 pub async fn get_midi<'a>(state: tauri::State<'a, MidiState>) -> Result<Midi, String> {
@@ -87,4 +90,64 @@ pub async fn send_midi_message<'a>(
     let midi = state.lock().unwrap();
     midi.send_message(midi_message)?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn get_midi_recorder<'a>(state: tauri::State<'a, MidiState>) -> Result<Recorder, String> {
+    let midi = state.lock().unwrap();
+    let recorder = midi.recorder.lock().unwrap();
+    let recorder_state = recorder.get_state();
+    Ok((&recorder_state).into())
+}
+
+#[tauri::command]
+pub async fn start_midi_recording<'a>(
+    state: tauri::State<'a, MidiState>,
+) -> Result<Recorder, String> {
+    let midi = state.lock().unwrap();
+
+    let mut recorder = midi.recorder.lock().unwrap();
+    recorder.start_recording()?;
+
+    let recorder_state = recorder.get_state();
+    Ok((&recorder_state).into())
+}
+
+#[tauri::command]
+pub async fn pause_midi_recording<'a>(
+    state: tauri::State<'a, MidiState>,
+) -> Result<Recorder, String> {
+    let midi = state.lock().unwrap();
+
+    let mut recorder = midi.recorder.lock().unwrap();
+    recorder.pause_recording()?;
+
+    let recorder_state = recorder.get_state();
+    Ok((&recorder_state).into())
+}
+
+#[tauri::command]
+pub async fn resume_midi_recording<'a>(
+    state: tauri::State<'a, MidiState>,
+) -> Result<Recorder, String> {
+    let midi = state.lock().unwrap();
+
+    let mut recorder = midi.recorder.lock().unwrap();
+    recorder.resume_recording()?;
+
+    let recorder_state = recorder.get_state();
+    Ok((&recorder_state).into())
+}
+
+#[tauri::command]
+pub async fn stop_midi_recording<'a>(
+    state: tauri::State<'a, MidiState>,
+) -> Result<Recorder, String> {
+    let midi = state.lock().unwrap();
+
+    let mut recorder = midi.recorder.lock().unwrap();
+    recorder.stop_recording()?;
+
+    let recorder_state = recorder.get_state();
+    Ok((&recorder_state).into())
 }

@@ -3,7 +3,10 @@ use std::sync::{Arc, Mutex};
 use midir::MidiInput;
 use tauri::ipc::Channel;
 
-use crate::midi::message::MidiMessage;
+use crate::midi::{
+    message::MidiMessage,
+    recorder::{MidiRecorder, RecorderState},
+};
 
 pub mod commands;
 pub mod message;
@@ -38,6 +41,7 @@ pub struct MidiStateInner {
     pub available_output_ports: Vec<MidiOutputPort>,
     pub input_connection: Option<MidiInputConnection>,
     pub output_connection: Option<MidiOutputConnection>,
+    pub recorder: Arc<Mutex<MidiRecorder>>,
     pub frontend_channel: Arc<Mutex<Option<Channel<MidiMessage>>>>,
 }
 
@@ -102,6 +106,7 @@ impl MidiStateInner {
         let midi_port =
             midi_port.ok_or_else(|| format!("Input port not found: {}", port.name.as_str()))?;
 
+        let recorder = self.recorder.clone();
         let frontend_channel = self.frontend_channel.clone();
         let connection = input
             .connect(
@@ -116,6 +121,13 @@ impl MidiStateInner {
                             return;
                         }
                     };
+
+                    let mut recorder = recorder.lock().unwrap();
+                    if let RecorderState::Recording { .. } = recorder.get_state() {
+                        recorder.add_message(message.clone()).unwrap_or_else(|e| {
+                            eprintln!("Failed to record MIDI message: {}", e);
+                        });
+                    }
 
                     // FIXME: introduce debounce mechanism to avoid flooding the frontend
                     let frontend_channel = frontend_channel.lock().unwrap();
