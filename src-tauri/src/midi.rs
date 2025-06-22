@@ -191,7 +191,7 @@ impl MidiStateInner {
             connection
                 .lock()
                 .unwrap()
-                .send(msg.as_slice())
+                .send(msg)
                 .map_err(|e| format!("Failed to send MIDI message to output port: {}", e))
         })?;
 
