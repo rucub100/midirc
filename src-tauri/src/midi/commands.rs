@@ -120,10 +120,5 @@ pub async fn stop_midi_recording<'a>(
     let mut recorder = midi.recorder.lock().unwrap();
     recorder.stop_recording()?;
 
-    // TODO: WIP testing placeholder, remove when playback is implemented
-    let mut playback = midi.playback.lock().unwrap();
-    playback.load_data(&recorder.get_recordings()[0])?;
-    playback.play()?;
-
     Ok((&*recorder).into())
 }

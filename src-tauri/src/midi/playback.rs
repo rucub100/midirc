@@ -3,13 +3,15 @@ use std::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
     },
-    thread::{self, JoinHandle},
+    thread::{self},
     time::{Duration, Instant},
 };
 
-use crate::midi::message::{MidiMessage, TimeStampedMidiMessage};
+use tauri::async_runtime::JoinHandle;
 
-type MidiPlayerFn = Box<dyn Fn(Vec<u8>) -> Result<(), String> + Send + 'static>;
+use crate::midi::message::TimeStampedMidiMessage;
+
+type MidiPlayerFn = Arc<dyn Fn(&[u8]) -> Result<(), String> + Sync + Send + 'static>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PlaybackState {
@@ -18,10 +20,9 @@ pub enum PlaybackState {
     Paused,
 }
 
-pub struct MidiPlayback {
+pub struct MidiPlaybackInner {
     state: PlaybackState,
-    buffer: Option<Vec<TimeStampedMidiMessage>>,
-    player: Arc<Mutex<Option<MidiPlayerFn>>>,
+    player: Option<MidiPlayerFn>,
     position: Arc<AtomicUsize>,
     // Thread management
     thread_handle: Option<JoinHandle<()>>,
@@ -29,16 +30,21 @@ pub struct MidiPlayback {
     signal_pause: Option<Arc<AtomicBool>>,
 }
 
+pub struct MidiPlayback {
+    inner: Arc<Mutex<MidiPlaybackInner>>,
+}
+
 impl Default for MidiPlayback {
     fn default() -> Self {
         Self {
-            state: PlaybackState::Stopped,
-            buffer: None,
-            player: Arc::new(Mutex::new(None)),
-            position: Arc::new(AtomicUsize::new(0)),
-            thread_handle: None,
-            signal_stop: None,
-            signal_pause: None,
+            inner: Arc::new(Mutex::new(MidiPlaybackInner {
+                state: PlaybackState::Stopped,
+                player: None,
+                position: Arc::new(AtomicUsize::new(0)),
+                thread_handle: None,
+                signal_stop: None,
+                signal_pause: None,
+            })),
         }
     }
 }
@@ -46,20 +52,20 @@ impl Default for MidiPlayback {
 impl MidiPlayback {
     pub fn set_player<F>(&mut self, player: F) -> Result<(), String>
     where
-        F: Fn(Vec<u8>) -> Result<(), String> + Send + 'static,
+        F: Fn(&[u8]) -> Result<(), String> + Sync + Send + 'static,
     {
-        if self.state != PlaybackState::Stopped {
+        let mut inner = self.inner.lock().unwrap();
+
+        if inner.state != PlaybackState::Stopped {
             return Err("Cannot set player while playback is in progress".to_string());
         }
-        let mut player_lock = self.player.lock().unwrap();
-        *player_lock = Some(Box::new(player));
+
+        inner.player = Some(Arc::new(player));
+
         Ok(())
     }
-    pub fn load_data(&mut self, data: &Vec<TimeStampedMidiMessage>) -> Result<(), String> {
-        // Validation checks
-        if self.state != PlaybackState::Stopped {
-            return Err("First stop playback before loading new data".to_string());
-        }
+
+    fn load_data(data: &Vec<TimeStampedMidiMessage>) -> Result<Vec<(u64, Vec<u8>)>, String> {
         if data.is_empty() {
             return Err("Cannot load empty data".to_string());
         }
@@ -73,60 +79,50 @@ impl MidiPlayback {
                 msg.timestamp_microseconds -= start_timestamp;
             });
         }
-        // convert absolute timestamps to relative timestamps (delta)
-        normalized_data = normalized_data
+        // Convert absolute timestamps to relative timestamps (delta)
+        let normalized_data = normalized_data
             .iter()
             .enumerate()
             .map(|(index, msg)| {
                 if index > 0 {
-                    TimeStampedMidiMessage {
-                        timestamp_microseconds: msg.timestamp_microseconds
+                    (
+                        msg.timestamp_microseconds
                             - normalized_data[index - 1].timestamp_microseconds,
-                        message: msg.message.clone(),
-                    }
+                        msg.message.clone().into(),
+                    )
                 } else {
-                    msg.clone()
+                    (msg.timestamp_microseconds, msg.message.clone().into())
                 }
             })
-            .collect(); // FIXME: also convert structured MIDI messages to bytes
+            .collect();
 
-        self.buffer = Some(normalized_data);
-        self.position.store(0, Ordering::SeqCst);
-
-        Ok(())
+        Ok(normalized_data)
     }
 
-    pub fn play(&mut self) -> Result<(), String> {
-        // FIXME: cleanup previous playback is thread already finished (we may need to do this for multiple playback commands)
-        // Validation checks
-        if self.state != PlaybackState::Stopped {
-            return Err("Playback is already in progress or paused".to_string());
-        }
-        if self.buffer.is_none() {
-            return Err("No data loaded for playback".to_string());
-        }
-        if self.position.load(Ordering::SeqCst) >= self.buffer.as_ref().unwrap().len() {
-            return Err("Playback position is out of bounds".to_string());
-        }
-        if self.thread_handle.is_some() {
-            return Err("Playback thread is already running".to_string());
-        }
-        if self.signal_stop.is_some() || self.signal_pause.is_some() {
-            return Err("Playback signals are already initialized".to_string());
-        }
+    pub async fn play(&mut self, data: &Vec<TimeStampedMidiMessage>) -> Result<(), String> {
+        self.stop().await?;
 
-        // Initialize playback
+        let mut inner = self.inner.lock().unwrap();
+
+        let buffer = Self::load_data(data)?;
         let signal_stop = Arc::new(AtomicBool::new(false));
         let signal_pause = Arc::new(AtomicBool::new(false));
-        self.signal_stop = Some(signal_stop.clone());
-        self.signal_pause = Some(signal_pause.clone());
-        let playback_data = self.buffer.as_ref().unwrap().clone();
-        let position = self.position.clone();
-        let player = self.player.clone();
+
+        inner.state = PlaybackState::Playing;
+        inner.position.store(0, Ordering::SeqCst);
+        inner.signal_stop = Some(signal_stop.clone());
+        inner.signal_pause = Some(signal_pause.clone());
+
+        let position = inner.position.clone();
+        let player = if let Some(player) = inner.player.as_ref() {
+            player.clone()
+        } else {
+            return Err("No MIDI player set".to_string());
+        };
         let playback_thread = thread::spawn(move || {
             let start = Instant::now();
             let mut time = Duration::ZERO;
-            for (index, msg) in playback_data.iter().enumerate() {
+            for (index, msg) in buffer.iter().enumerate() {
                 while signal_pause.load(Ordering::SeqCst) {
                     thread::sleep(Duration::from_millis(100));
                 }
@@ -134,42 +130,71 @@ impl MidiPlayback {
                     break;
                 }
 
-                time += Duration::from_micros(msg.timestamp_microseconds);
+                time += Duration::from_micros(msg.0);
+                // FIXME: does not work correctly when sequence is paused
                 let elapsed = start.elapsed();
                 if elapsed < time {
                     thread::sleep(time - elapsed);
                 }
 
-                if let Some(player) = player.lock().unwrap().as_ref() {
-                    // FIXME: make sure message is already in bytes format at this point (performance)
-                    if let Err(error) = player(msg.message.clone().into()) {
-                        eprintln!("{error}");
-                        break;
-                    }
-                } else {
+                if let Err(error) = player(msg.1.as_slice()) {
+                    eprintln!("{error}");
                     break;
                 }
 
                 position.store(index + 1, Ordering::SeqCst);
             }
         });
-        self.thread_handle = Some(playback_thread);
+
+        let inner_clone = self.inner.clone();
+        let handle = tauri::async_runtime::spawn_blocking(move || {
+            let result = playback_thread.join();
+
+            if let Err(e) = result {
+                eprintln!("{e:?}");
+            }
+
+            let mut inner_clone = inner_clone.lock().unwrap();
+            inner_clone.state = PlaybackState::Stopped;
+            inner_clone.position.store(0, Ordering::SeqCst);
+            inner_clone.signal_pause = None;
+            inner_clone.signal_stop = None;
+            inner_clone.thread_handle = None;
+        });
+        inner.thread_handle = Some(handle);
 
         Ok(())
     }
 
     pub fn pause(&mut self) -> Result<(), String> {
         todo!("Implement pause functionality");
-        Ok(())
     }
 
     pub fn resume(&mut self) -> Result<(), String> {
         todo!("Implement resume functionality");
-        Ok(())
     }
 
-    pub fn stop(&mut self) -> Result<(), String> {
-        todo!("Implement stop functionality");
+    pub async fn stop(&mut self) -> Result<(), String> {
+        let handle = {
+            let mut inner = self.inner.lock().unwrap();
+
+            if let Some(handle) = inner.thread_handle.take() {
+                if let Some(signal_stop) = inner.signal_stop.take() {
+                    signal_stop.store(true, Ordering::SeqCst);
+                }
+
+                Some(handle)
+            } else {
+                None
+            }
+        };
+
+        if let Some(handle) = handle {
+            handle
+                .await
+                .map_err(|e| format!("Failed to join playback thread: {e}"))?;
+        }
+
         Ok(())
     }
 }
