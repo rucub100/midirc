@@ -9,8 +9,8 @@ use midi::{
 };
 
 use crate::midi::commands::{
-    get_midi_recorder, register_midi_channel, send_midi_message, start_midi_recording,
-    stop_midi_recording,
+    get_midi_recorder, play_midi_recording, register_midi_channel, send_midi_message,
+    start_midi_recording, stop_midi_recording,
 };
 
 mod frontend;
@@ -33,7 +33,8 @@ pub fn run() {
             send_midi_message,
             get_midi_recorder,
             start_midi_recording,
-            stop_midi_recording
+            stop_midi_recording,
+            play_midi_recording
         ])
         .setup(|app| {
             #[cfg(debug_assertions)] // only include this code on debug builds
@@ -46,9 +47,11 @@ pub fn run() {
             // initialize MIDI state
             {
                 let midi = app.state::<MidiState>();
-                let mut midi = midi.lock().unwrap();
-                let _ = midi.scan_input();
-                let _ = midi.scan_output();
+                tauri::async_runtime::block_on(async {
+                    let mut midi = midi.lock().await;
+                    let _ = midi.scan_input();
+                    let _ = midi.scan_output();
+                });
             }
 
             Ok(())

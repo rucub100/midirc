@@ -9,7 +9,7 @@ use std::{
 
 use tauri::async_runtime::JoinHandle;
 
-use crate::midi::message::TimeStampedMidiMessage;
+use crate::midi::message::{MidiChannel, MidiMessage, TimeStampedMidiMessage};
 
 type MidiPlayerFn = Arc<dyn Fn(&[u8]) -> Result<(), String> + Sync + Send + 'static>;
 
@@ -120,18 +120,36 @@ impl MidiPlayback {
             return Err("No MIDI player set".to_string());
         };
         let playback_thread = thread::spawn(move || {
-            let start = Instant::now();
+            let play_stop = || {
+                // FIXME: Make channel configurable
+                let msg_all_notes_off: Vec<u8> =
+                    MidiMessage::all_notes_off(MidiChannel::Channel1).into();
+                let msg_all_sound_off: Vec<u8> =
+                    MidiMessage::all_sound_off(MidiChannel::Channel1).into();
+                let _ = player(msg_all_notes_off.as_slice()).map_err(|e| e.to_string());
+                let _ = player(&msg_all_sound_off.as_slice()).map_err(|e| e.to_string());
+            };
+            let mut start = Instant::now();
             let mut time = Duration::ZERO;
             for (index, msg) in buffer.iter().enumerate() {
-                while signal_pause.load(Ordering::SeqCst) {
-                    thread::sleep(Duration::from_millis(100));
+                if signal_pause.load(Ordering::SeqCst) {
+                    let elapsed = start.elapsed();
+                    while signal_pause.load(Ordering::SeqCst) {
+                        if signal_stop.load(Ordering::SeqCst) {
+                            play_stop();
+                            return;
+                        }
+                        thread::sleep(Duration::from_millis(50));
+                    }
+                    start = Instant::now() - elapsed;
                 }
+
                 if signal_stop.load(Ordering::SeqCst) {
+                    play_stop();
                     break;
                 }
 
                 time += Duration::from_micros(msg.0);
-                // FIXME: does not work correctly when sequence is paused
                 let elapsed = start.elapsed();
                 if elapsed < time {
                     thread::sleep(time - elapsed);
@@ -167,11 +185,35 @@ impl MidiPlayback {
     }
 
     pub fn pause(&mut self) -> Result<(), String> {
-        todo!("Implement pause functionality");
+        let mut inner = self.inner.lock().unwrap();
+
+        if inner.state != PlaybackState::Playing {
+            return Err("Playback is not active, cannot pause".to_string());
+        }
+
+        inner.state = PlaybackState::Paused;
+
+        if let Some(signal) = &inner.signal_pause {
+            signal.store(true, Ordering::SeqCst);
+        }
+
+        Ok(())
     }
 
     pub fn resume(&mut self) -> Result<(), String> {
-        todo!("Implement resume functionality");
+        let mut inner = self.inner.lock().unwrap();
+
+        if inner.state != PlaybackState::Paused {
+            return Err("Playback is not paused, cannot resume".to_string());
+        }
+
+        inner.state = PlaybackState::Playing;
+
+        if let Some(signal) = &inner.signal_pause {
+            signal.store(false, Ordering::SeqCst);
+        }
+
+        Ok(())
     }
 
     pub async fn stop(&mut self) -> Result<(), String> {

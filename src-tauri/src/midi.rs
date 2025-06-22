@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use midir::MidiInput;
+use tauri::async_runtime::Mutex as AsyncMutex;
 use tauri::ipc::Channel;
 
 use crate::midi::{
@@ -44,7 +45,7 @@ pub struct MidiStateInner {
     pub input_connection: Option<MidiInputConnection>,
     pub output_connection: Option<MidiOutputConnection>,
     pub recorder: Arc<Mutex<MidiRecorder>>,
-    pub playback: Arc<Mutex<MidiPlayback>>,
+    pub playback: Arc<AsyncMutex<MidiPlayback>>,
     pub frontend_channel: Arc<Mutex<Option<Channel<MidiMessage>>>>,
 }
 
@@ -158,7 +159,7 @@ impl MidiStateInner {
         self.output_connection = None;
     }
 
-    pub fn connect_output(&mut self, index: usize) -> Result<(), String> {
+    pub async fn connect_output(&mut self, index: usize) -> Result<(), String> {
         if self.output_connection.is_some() {
             return Err("Output connection already exists. Disconnect first.".to_string());
         }
@@ -187,7 +188,7 @@ impl MidiStateInner {
         });
 
         let connection = self.output_connection.as_ref().unwrap()._connection.clone();
-        self.playback.lock().unwrap().set_player(move |msg| {
+        self.playback.lock().await.set_player(move |msg| {
             connection
                 .lock()
                 .unwrap()
@@ -221,4 +222,4 @@ impl MidiStateInner {
     }
 }
 
-pub type MidiState = Mutex<MidiStateInner>;
+pub type MidiState = AsyncMutex<MidiStateInner>;

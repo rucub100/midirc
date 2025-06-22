@@ -607,6 +607,20 @@ impl MidiMessage {
             }),
         })
     }
+
+    pub fn all_notes_off(channel: MidiChannel) -> Self {
+        MidiMessage::Channel {
+            channel,
+            message: ChannelMessage::Mode(ChannelModeMessage::AllNotesOff),
+        }
+    }
+
+    pub fn all_sound_off(channel: MidiChannel) -> Self {
+        MidiMessage::Channel {
+            channel,
+            message: ChannelMessage::Mode(ChannelModeMessage::AllSoundOff),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Clone)]
