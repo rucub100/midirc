@@ -71,6 +71,7 @@ impl MidiRecorder {
         message: MidiMessage,
         timestamp_microseconds: u64,
     ) -> Result<(), String> {
+        // FIXME: We may want to filter messages here (e.g. skip active sensing messages)
         if self.state == RecorderState::Recording {
             self.buffer.push(TimeStampedMidiMessage {
                 timestamp_microseconds,

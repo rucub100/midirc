@@ -3,7 +3,7 @@ use tauri::ipc::Channel;
 use super::MidiState;
 use crate::{
     frontend::{Midi, Recorder},
-    midi::message::MidiMessage,
+    midi::{message::MidiMessage, playback::TrackInfo},
 };
 
 #[tauri::command]
@@ -140,7 +140,9 @@ pub async fn play_midi_recording<'a>(
     };
 
     let mut playback = midi.playback.lock().await;
-    playback.play(&recording).await?;
+    playback
+        .play(&recording, TrackInfo::Recording(index))
+        .await?;
 
     // FIXME: create frontend DTO for playback
     Ok(())

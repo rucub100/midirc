@@ -14,10 +14,15 @@ use crate::midi::message::{MidiChannel, MidiMessage, TimeStampedMidiMessage};
 type MidiPlayerFn = Arc<dyn Fn(&[u8]) -> Result<(), String> + Sync + Send + 'static>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum TrackInfo {
+    Recording(usize),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PlaybackState {
     Stopped,
-    Playing,
-    Paused,
+    Playing(TrackInfo),
+    Paused(TrackInfo),
 }
 
 pub struct MidiPlaybackInner {
@@ -99,7 +104,11 @@ impl MidiPlayback {
         Ok(normalized_data)
     }
 
-    pub async fn play(&mut self, data: &Vec<TimeStampedMidiMessage>) -> Result<(), String> {
+    pub async fn play(
+        &mut self,
+        data: &Vec<TimeStampedMidiMessage>,
+        track_info: TrackInfo,
+    ) -> Result<(), String> {
         self.stop().await?;
 
         let mut inner = self.inner.lock().unwrap();
@@ -108,7 +117,7 @@ impl MidiPlayback {
         let signal_stop = Arc::new(AtomicBool::new(false));
         let signal_pause = Arc::new(AtomicBool::new(false));
 
-        inner.state = PlaybackState::Playing;
+        inner.state = PlaybackState::Playing(track_info);
         inner.position.store(0, Ordering::SeqCst);
         inner.signal_stop = Some(signal_stop.clone());
         inner.signal_pause = Some(signal_pause.clone());
@@ -189,11 +198,10 @@ impl MidiPlayback {
     pub fn pause(&mut self) -> Result<(), String> {
         let mut inner = self.inner.lock().unwrap();
 
-        if inner.state != PlaybackState::Playing {
-            return Err("Playback is not active, cannot pause".to_string());
-        }
-
-        inner.state = PlaybackState::Paused;
+        inner.state = match inner.state {
+            PlaybackState::Playing(ref track_info) => PlaybackState::Paused(track_info.clone()),
+            _ => return Err("Playback is not active, cannot pause".to_string()),
+        };
 
         if let Some(signal) = &inner.signal_pause {
             signal.store(true, Ordering::SeqCst);
@@ -205,11 +213,10 @@ impl MidiPlayback {
     pub fn resume(&mut self) -> Result<(), String> {
         let mut inner = self.inner.lock().unwrap();
 
-        if inner.state != PlaybackState::Paused {
-            return Err("Playback is not paused, cannot resume".to_string());
-        }
-
-        inner.state = PlaybackState::Playing;
+        inner.state = match inner.state {
+            PlaybackState::Paused(ref track_info) => PlaybackState::Playing(track_info.clone()),
+            _ => return Err("Playback is not paused, cannot resume".to_string()),
+        };
 
         if let Some(signal) = &inner.signal_pause {
             signal.store(false, Ordering::SeqCst);
