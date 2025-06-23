@@ -119,6 +119,8 @@ impl MidiPlayback {
         } else {
             return Err("No MIDI player set".to_string());
         };
+        // FIXME: set priority to high for real-time playback
+        // use accurate sleeping (e.g. https://crates.io/crates/spin_sleep)
         let playback_thread = thread::spawn(move || {
             let play_stop = || {
                 // FIXME: Make channel configurable
