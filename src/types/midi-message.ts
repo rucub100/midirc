@@ -1,5 +1,3 @@
-import { Midi } from "./midi";
-
 export type MidiChannel =
   | "channel1"
   | "channel2"
