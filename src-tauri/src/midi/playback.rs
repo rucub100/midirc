@@ -13,6 +13,8 @@ use crate::midi::message::{MidiChannel, MidiMessage, TimeStampedMidiMessage};
 
 type MidiPlayerFn = Arc<dyn Fn(&[u8]) -> Result<(), String> + Sync + Send + 'static>;
 
+const MAX_SLEEP_DURATION: Duration = Duration::from_millis(50);
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TrackInfo {
     Recording(usize),
@@ -28,7 +30,8 @@ pub enum PlaybackState {
 pub struct MidiPlaybackInner {
     state: PlaybackState,
     player: Option<MidiPlayerFn>,
-    position: Arc<AtomicUsize>,
+    position_milliseconds: Arc<AtomicUsize>,
+    duration_milliseconds: Option<Arc<AtomicUsize>>,
     // Thread management
     thread_handle: Option<JoinHandle<()>>,
     signal_stop: Option<Arc<AtomicBool>>,
@@ -45,7 +48,8 @@ impl Default for MidiPlayback {
             inner: Arc::new(Mutex::new(MidiPlaybackInner {
                 state: PlaybackState::Stopped,
                 player: None,
-                position: Arc::new(AtomicUsize::new(0)),
+                position_milliseconds: Arc::new(AtomicUsize::new(0)),
+                duration_milliseconds: None,
                 thread_handle: None,
                 signal_stop: None,
                 signal_pause: None,
@@ -55,6 +59,24 @@ impl Default for MidiPlayback {
 }
 
 impl MidiPlayback {
+    pub fn get_state(&self) -> PlaybackState {
+        let inner = self.inner.lock().unwrap();
+        inner.state.clone()
+    }
+
+    pub fn get_duration(&self) -> Option<Duration> {
+        let inner = self.inner.lock().unwrap();
+        match &inner.duration_milliseconds {
+            Some(duration) => Some(Duration::from_millis(duration.load(Ordering::SeqCst) as u64)),
+            None => None,
+        }
+    }
+
+    pub fn get_position(&self) -> Duration {
+        let inner = self.inner.lock().unwrap();
+        Duration::from_millis(inner.position_milliseconds.load(Ordering::SeqCst) as u64)
+    }
+
     pub fn set_player<F>(&mut self, player: F) -> Result<(), String>
     where
         F: Fn(&[u8]) -> Result<(), String> + Sync + Send + 'static,
@@ -118,11 +140,14 @@ impl MidiPlayback {
         let signal_pause = Arc::new(AtomicBool::new(false));
 
         inner.state = PlaybackState::Playing(track_info);
-        inner.position.store(0, Ordering::SeqCst);
+        inner.position_milliseconds.store(0, Ordering::SeqCst);
+        inner.duration_milliseconds = Some(Arc::new(AtomicUsize::new(
+            data.last().unwrap().timestamp_microseconds as usize,
+        )));
         inner.signal_stop = Some(signal_stop.clone());
         inner.signal_pause = Some(signal_pause.clone());
 
-        let position = inner.position.clone();
+        let position = inner.position_milliseconds.clone();
         let player = if let Some(player) = inner.player.as_ref() {
             player.clone()
         } else {
@@ -142,36 +167,39 @@ impl MidiPlayback {
             };
             let mut start = Instant::now();
             let mut time = Duration::ZERO;
-            for (index, msg) in buffer.iter().enumerate() {
-                if signal_pause.load(Ordering::SeqCst) {
-                    let elapsed = start.elapsed();
-                    while signal_pause.load(Ordering::SeqCst) {
-                        if signal_stop.load(Ordering::SeqCst) {
-                            play_stop();
-                            return;
-                        }
-                        thread::sleep(Duration::from_millis(50));
-                    }
-                    start = Instant::now() - elapsed;
-                }
-
-                if signal_stop.load(Ordering::SeqCst) {
-                    play_stop();
-                    break;
-                }
-
+            for msg in buffer.iter() {
                 time += Duration::from_micros(msg.0);
-                let elapsed = start.elapsed();
-                if elapsed < time {
-                    thread::sleep(time - elapsed);
+                let mut elapsed = start.elapsed();
+                position.store(elapsed.as_millis() as usize, Ordering::SeqCst);
+                while elapsed < time {
+                    if signal_pause.load(Ordering::SeqCst) {
+                        let elapsed = start.elapsed();
+                        while signal_pause.load(Ordering::SeqCst) {
+                            if signal_stop.load(Ordering::SeqCst) {
+                                play_stop();
+                                return;
+                            }
+                            thread::sleep(MAX_SLEEP_DURATION);
+                        }
+                        start = Instant::now() - elapsed;
+                    }
+
+                    if signal_stop.load(Ordering::SeqCst) {
+                        play_stop();
+                        break;
+                    }
+
+                    let duration = time - elapsed;
+                    // sleep no more than 50ms to be able to handle pause/stop signals quickly
+                    let sleep_duration = MAX_SLEEP_DURATION.min(duration);
+                    thread::sleep(sleep_duration);
+                    elapsed = start.elapsed();
                 }
 
                 if let Err(error) = player(msg.1.as_slice()) {
                     eprintln!("{error}");
                     break;
                 }
-
-                position.store(index + 1, Ordering::SeqCst);
             }
         });
 
@@ -185,7 +213,7 @@ impl MidiPlayback {
 
             let mut inner_clone = inner_clone.lock().unwrap();
             inner_clone.state = PlaybackState::Stopped;
-            inner_clone.position.store(0, Ordering::SeqCst);
+            inner_clone.position_milliseconds.store(0, Ordering::SeqCst);
             inner_clone.signal_pause = None;
             inner_clone.signal_stop = None;
             inner_clone.thread_handle = None;

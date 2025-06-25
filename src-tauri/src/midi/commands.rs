@@ -2,7 +2,7 @@ use tauri::ipc::Channel;
 
 use super::MidiState;
 use crate::{
-    frontend::{Midi, Recorder},
+    frontend::{Midi, Playback, Recorder},
     midi::{message::MidiMessage, playback::TrackInfo},
 };
 
@@ -124,10 +124,18 @@ pub async fn stop_midi_recording<'a>(
 }
 
 #[tauri::command]
+pub async fn get_midi_playback<'a>(state: tauri::State<'a, MidiState>) -> Result<Playback, String> {
+    let midi = state.lock().await;
+    let playback = midi.playback.lock().await;
+
+    Ok((&*playback).into())
+}
+
+#[tauri::command]
 pub async fn play_midi_recording<'a>(
     index: usize,
     state: tauri::State<'a, MidiState>,
-) -> Result<(), String> {
+) -> Result<Playback, String> {
     let midi = state.lock().await;
 
     let recording = {
@@ -144,6 +152,38 @@ pub async fn play_midi_recording<'a>(
         .play(&recording, TrackInfo::Recording(index))
         .await?;
 
-    // FIXME: create frontend DTO for playback
-    Ok(())
+    Ok((&*playback).into())
+}
+
+#[tauri::command]
+pub async fn pause_midi_playback<'a>(
+    state: tauri::State<'a, MidiState>,
+) -> Result<Playback, String> {
+    let midi = state.lock().await;
+    let mut playback = midi.playback.lock().await;
+    playback.pause()?;
+
+    Ok((&*playback).into())
+}
+
+#[tauri::command]
+pub async fn resume_midi_playback<'a>(
+    state: tauri::State<'a, MidiState>,
+) -> Result<Playback, String> {
+    let midi = state.lock().await;
+    let mut playback = midi.playback.lock().await;
+    playback.resume()?;
+
+    Ok((&*playback).into())
+}
+
+#[tauri::command]
+pub async fn stop_midi_playback<'a>(
+    state: tauri::State<'a, MidiState>,
+) -> Result<Playback, String> {
+    let midi = state.lock().await;
+    let mut playback = midi.playback.lock().await;
+    playback.stop().await?;
+
+    Ok((&*playback).into())
 }

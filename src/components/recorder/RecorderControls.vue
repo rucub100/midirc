@@ -1,25 +1,27 @@
 <script setup lang="ts">
-import IconButton from '../common/IconButton.vue';
-import { useRecorder } from '../../hooks/use-recorder';
-import { computed } from 'vue';
+import { PropType } from 'vue';
 
-const { recorder, startRecording, stopRecording } = useRecorder();
-const state = computed(() => recorder.value.state);
+import IconButton from '../common/IconButton.vue';
+import { Recorder } from '../../types/recorder';
+
+defineProps({
+    state: {
+        type: String as PropType<Recorder['state']>,
+        required: true,
+    },
+});
+
+const emit = defineEmits<{
+    (e: 'startRecording'): void,
+    (e: 'stopRecording'): void,
+}>();
 </script>
 
 <template>
     <div class="flex flex-row p-2 border border-[var(--color-outline)] w-max rounded">
-        <IconButton v-if="state !== 'stopped'" icon="stop" class="p-2" @click="stopRecording">
+        <IconButton v-if="state !== 'stopped'" icon="stop" class="p-2" @click="emit('stopRecording')">
         </IconButton>
-        <IconButton v-if="state === 'stopped'" icon="fiber_manual_record" class="p-2" @click="startRecording">
+        <IconButton v-if="state === 'stopped'" icon="fiber_manual_record" class="p-2" @click="emit('startRecording')">
         </IconButton>
-        <!-- <IconButton v-else-if="state === 'recording'" icon="pause" class="p-2" @click="pauseRecording">
-        </IconButton>
-        <IconButton v-else-if="state === 'paused'" icon="resume" class="p-2" @click="resumeRecording">
-        </IconButton> -->
-        <!-- <IconButton icon="play_arrow" class="p-2"></IconButton>
-        <IconButton icon="eject" class="p-2"></IconButton>
-        <IconButton icon="file_open" class="p-2"></IconButton>
-        <IconButton icon="file_save" class="p-2"></IconButton> -->
     </div>
 </template>

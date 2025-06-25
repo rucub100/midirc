@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::midi::MidiStateInner;
+use crate::midi::{playback::MidiPlayback, MidiStateInner};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -81,5 +81,43 @@ impl From<&crate::midi::recorder::MidiRecorder> for Recorder {
         let recordings = value.get_recordings().iter().map(|_| ()).collect(); // FIXME: Placeholder for when playback is implemented
 
         Recorder { state, recordings }
+    }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum PlaybackState {
+    Stopped,
+    Playing,
+    Paused,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Playback {
+    pub state: PlaybackState,
+    pub title: Option<String>,
+    pub duration_milliseconds: Option<u32>,
+    pub position_milliseconds: u32,
+}
+
+impl From<&MidiPlayback> for Playback {
+    fn from(playback: &MidiPlayback) -> Self {
+        let src_state = playback.get_state();
+        let state = match src_state {
+            crate::midi::playback::PlaybackState::Stopped => PlaybackState::Stopped,
+            crate::midi::playback::PlaybackState::Playing(_) => PlaybackState::Playing,
+            crate::midi::playback::PlaybackState::Paused(_) => PlaybackState::Paused,
+        };
+        let title = None;
+        let duration_milliseconds = playback.get_duration().map(|d| d.as_millis() as u32);
+        let position_milliseconds = playback.get_position().as_millis() as u32;
+
+        Playback {
+            state,
+            title,
+            duration_milliseconds,
+            position_milliseconds,
+        }
     }
 }

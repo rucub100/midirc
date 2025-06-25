@@ -1,24 +1,30 @@
 <script setup lang="ts">
-import IconButton from '../components/common/IconButton.vue';
 import RecorderControls from '../components/recorder/RecorderControls.vue';
+import PlaybackControls from '../components/recorder/PlaybackControls.vue';
+import Recording from '../components/recorder/Recording.vue';
 import { usePlayback } from '../hooks/use-playback';
 import { useRecorder } from '../hooks/use-recorder';
 
-const { recorder } = useRecorder();
-const { playRecording } = usePlayback();
+const { recorder, startRecording, stopRecording } = useRecorder();
+const { playback, playRecording, pausePlayback, resumePlayback, stopPlayback } = usePlayback();
+
+// TODO: track the playback state with interval and make sure to cleanup (onMounted/onUnmounted)
 </script>
 
 <template>
     <div class="w-full flex flex-col p-4 gap-4 relative">
-        <RecorderControls></RecorderControls>
+        <div class="flex flex-row gap-4">
+            <RecorderControls :state="recorder.state" @start-recording="startRecording" @stop-recording="stopRecording">
+            </RecorderControls>
+            <PlaybackControls :state="playback.state" @pause="pausePlayback" @resume="resumePlayback"
+                @stop="stopPlayback"></PlaybackControls>
+        </div>
         <div class="flex flex-col">
             <h1 class="mb-2">Recordings</h1>
             <div class="flex flex-col gap-2">
-                <div v-for="(_recording, index) in recorder.recordings" :key="index"
-                    class="flex flex-row items-center border border-[var(--color-outline)] rounded p-2 ">
-                    <IconButton icon="play_arrow" class="p-2" @click="playRecording(index)"></IconButton>
-                    <h2>Recording {{ index }}</h2>
-                </div>
+                <template v-for="(_recording, index) in recorder.recordings" :key="index">
+                    <Recording :index="index" @play="playRecording(index)"></Recording>
+                </template>
             </div>
         </div>
     </div>
