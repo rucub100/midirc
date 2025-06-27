@@ -6,7 +6,7 @@ import { usePlayback } from '../hooks/use-playback';
 import { useRecorder } from '../hooks/use-recorder';
 
 const { recorder, startRecording, stopRecording } = useRecorder();
-const { playback, playRecording, pausePlayback, resumePlayback, stopPlayback } = usePlayback();
+const { playback, playRecording, pausePlayback, resumePlayback, stopPlayback, updatePlayback } = usePlayback();
 
 // TODO: track the playback state with interval and make sure to cleanup (onMounted/onUnmounted)
 </script>
@@ -16,8 +16,9 @@ const { playback, playRecording, pausePlayback, resumePlayback, stopPlayback } =
         <div class="flex flex-row gap-4">
             <RecorderControls :state="recorder.state" @start-recording="startRecording" @stop-recording="stopRecording">
             </RecorderControls>
-            <PlaybackControls :state="playback.state" @pause="pausePlayback" @resume="resumePlayback"
-                @stop="stopPlayback"></PlaybackControls>
+            <PlaybackControls :playback="playback" @pause="pausePlayback" @resume="resumePlayback" @stop="stopPlayback"
+                @end="updatePlayback">
+            </PlaybackControls>
         </div>
         <div class="flex flex-col">
             <h1 class="mb-2">Recordings</h1>

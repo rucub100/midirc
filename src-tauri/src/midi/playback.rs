@@ -142,7 +142,9 @@ impl MidiPlayback {
         inner.state = PlaybackState::Playing(track_info);
         inner.position_milliseconds.store(0, Ordering::SeqCst);
         inner.duration_milliseconds = Some(Arc::new(AtomicUsize::new(
-            data.last().unwrap().timestamp_microseconds as usize,
+            ((data.last().unwrap().timestamp_microseconds
+                - data.first().unwrap().timestamp_microseconds)
+                / 1000) as usize,
         )));
         inner.signal_stop = Some(signal_stop.clone());
         inner.signal_pause = Some(signal_pause.clone());

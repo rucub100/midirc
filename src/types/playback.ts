@@ -8,5 +8,6 @@ export type Playback = (
     }
   | {
       state: "paused";
+      durationMilliseconds: number;
     }
 ) & { title?: string; positionMilliseconds: number };

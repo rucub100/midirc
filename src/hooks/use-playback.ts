@@ -23,6 +23,16 @@ getMidiPlayback()
     console.error("Error fetching initial playback state:", error);
   });
 
+function updatePlayback() {
+  getMidiPlayback()
+    .then((playback) => {
+      globalPlayback.value = playback;
+    })
+    .catch((error) => {
+      console.error("Error fetching initial playback state:", error);
+    });
+}
+
 function playRecording(index: number) {
   playMidiRecording(index)
     .then((playback) => {
@@ -66,6 +76,7 @@ function stopPlayback() {
 export function usePlayback() {
   return {
     playback: globalPlayback,
+    updatePlayback,
     playRecording,
     pausePlayback,
     resumePlayback,
