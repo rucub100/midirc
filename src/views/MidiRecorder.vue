@@ -4,6 +4,7 @@ import PlaybackControls from '../components/recorder/PlaybackControls.vue';
 import Recording from '../components/recorder/Recording.vue';
 import { usePlayback } from '../hooks/use-playback';
 import { useRecorder } from '../hooks/use-recorder';
+import RecorderView from '../components/recorder/RecorderView.vue';
 
 const { recorder, startRecording, stopRecording } = useRecorder();
 const { playback, playRecording, pausePlayback, resumePlayback, stopPlayback, updatePlayback } = usePlayback();
@@ -18,7 +19,9 @@ const { playback, playRecording, pausePlayback, resumePlayback, stopPlayback, up
                 @end="updatePlayback">
             </PlaybackControls>
         </div>
-        <div class="flex flex-col">
+        <RecorderView></RecorderView>
+        <span v-if="recorder.recordings.length === 0">No recordings yet.</span>
+        <div v-else class="flex flex-col">
             <h1 class="mb-2">Recordings</h1>
             <div class="flex flex-col gap-2">
                 <template v-for="recording in recorder.recordings" :key="index">
