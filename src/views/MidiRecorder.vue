@@ -7,8 +7,6 @@ import { useRecorder } from '../hooks/use-recorder';
 
 const { recorder, startRecording, stopRecording } = useRecorder();
 const { playback, playRecording, pausePlayback, resumePlayback, stopPlayback, updatePlayback } = usePlayback();
-
-// TODO: track the playback state with interval and make sure to cleanup (onMounted/onUnmounted)
 </script>
 
 <template>
@@ -23,8 +21,8 @@ const { playback, playRecording, pausePlayback, resumePlayback, stopPlayback, up
         <div class="flex flex-col">
             <h1 class="mb-2">Recordings</h1>
             <div class="flex flex-col gap-2">
-                <template v-for="(_recording, index) in recorder.recordings" :key="index">
-                    <Recording :index="index" @play="playRecording(index)"></Recording>
+                <template v-for="recording in recorder.recordings" :key="index">
+                    <Recording :recording="recording" @play="playRecording(recording.index)"></Recording>
                 </template>
             </div>
         </div>

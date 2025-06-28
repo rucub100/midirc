@@ -2,6 +2,7 @@
 import { computed, PropType, ref, watch } from 'vue';
 import IconButton from '../common/IconButton.vue';
 import { Playback } from '../../types/playback';
+import { formatDuration } from '../../helpers/duration-helper';
 
 const props = defineProps({
     playback: {
@@ -14,18 +15,14 @@ const progress = ref(0);
 const progressTime = computed(() => {
     if (props.playback.state === 'playing' || props.playback.state === 'paused') {
         const absoluteProgress = progress.value * props.playback.durationMilliseconds / 100;
-        const minutes = Math.floor(absoluteProgress / 60000);
-        const seconds = Math.floor((absoluteProgress % 60000) / 1000);
-        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        return formatDuration(absoluteProgress);
     }
 
     return '00:00';
 });
 const durationTime = computed(() => {
     if (props.playback.state === 'playing' || props.playback.state === 'paused') {
-        const minutes = Math.floor(props.playback.durationMilliseconds / 60000);
-        const seconds = Math.floor((props.playback.durationMilliseconds % 60000) / 1000);
-        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        return formatDuration(props.playback.durationMilliseconds);
     }
 
     return '00:00';
@@ -78,14 +75,13 @@ const emit = defineEmits<{
         </IconButton>
         <IconButton v-if="playback.state === 'playing'" icon="pause" class="p-2" @click="emit('pause')"></IconButton>
         <IconButton v-if="playback.state === 'paused'" icon="resume" class="p-2" @click="emit('resume')"></IconButton>
-        <IconButton icon="stop" class="p-2" @click="emit('stop')"></IconButton>
         <span class="text-xs text-[var(--color-text-muted)]">{{ progressTime }}</span>
         <div class="w-[200px] flex flex-row items-center p-2 relative">
             <div class="h-[4px] w-full bg-[var(--color-text-muted)] rounded"></div>
             <div class="absolute left-2 h-[4px] bg-[var(--color-primary)] rounded"
                 :style="[`width: ${1.8 * progress}px`]">
             </div>
-            <span class="material-symbols-sharp absolute z-10 top-[-8px]"
+            <span v-if="playback.state !== 'stopped'" class="material-symbols-sharp absolute z-10 top-[-8px]"
                 :class="{ 'animate-pulse': playback.state === 'paused' }"
                 :style="[`left: ${1.8 * progress}px`, 'transition: left 100ms linear']">music_note</span>
         </div>

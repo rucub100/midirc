@@ -66,9 +66,16 @@ pub enum RecorderState {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct Recording {
+    index: usize,
+    duration_milliseconds: u32,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct Recorder {
     pub state: RecorderState,
-    pub recordings: Vec<()>, // FIXME: Placeholder for when playback is implemented
+    pub recordings: Vec<Recording>,
 }
 
 impl From<&crate::midi::recorder::MidiRecorder> for Recorder {
@@ -78,7 +85,27 @@ impl From<&crate::midi::recorder::MidiRecorder> for Recorder {
             crate::midi::recorder::RecorderState::Recording => RecorderState::Recording,
         };
 
-        let recordings = value.get_recordings().iter().map(|_| ()).collect(); // FIXME: Placeholder for when playback is implemented
+        let calc_duration_milliseconds =
+            |recording: &Vec<crate::midi::message::TimeStampedMidiMessage>| {
+                if recording.is_empty() {
+                    0
+                } else if recording.len() == 1 {
+                    (recording.first().unwrap().timestamp_microseconds / 1000) as u32
+                } else {
+                    let start_time = recording.first().unwrap().timestamp_microseconds;
+                    let end_time = recording.last().unwrap().timestamp_microseconds;
+                    ((end_time - start_time) / 1000) as u32
+                }
+            };
+        let recordings = value
+            .get_recordings()
+            .iter()
+            .enumerate()
+            .map(|(index, recording)| Recording {
+                index,
+                duration_milliseconds: calc_duration_milliseconds(recording),
+            })
+            .collect();
 
         Recorder { state, recordings }
     }
@@ -94,9 +121,17 @@ pub enum PlaybackState {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[serde(tag = "type")]
+pub enum PlaybackIdentifier {
+    Recording { index: usize },
+    MidiFile { path: String },
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct Playback {
     pub state: PlaybackState,
-    pub title: Option<String>,
+    pub identifier: Option<PlaybackIdentifier>,
     pub duration_milliseconds: Option<u32>,
     pub position_milliseconds: u32,
 }
@@ -104,18 +139,31 @@ pub struct Playback {
 impl From<&MidiPlayback> for Playback {
     fn from(playback: &MidiPlayback) -> Self {
         let src_state = playback.get_state();
-        let state = match src_state {
-            crate::midi::playback::PlaybackState::Stopped => PlaybackState::Stopped,
-            crate::midi::playback::PlaybackState::Playing(_) => PlaybackState::Playing,
-            crate::midi::playback::PlaybackState::Paused(_) => PlaybackState::Paused,
+        let (state, identifier) = match src_state {
+            crate::midi::playback::PlaybackState::Stopped => (PlaybackState::Stopped, None),
+            crate::midi::playback::PlaybackState::Playing(track_info) => (
+                PlaybackState::Playing,
+                match track_info {
+                    crate::midi::playback::TrackInfo::Recording(index) => {
+                        Some(PlaybackIdentifier::Recording { index })
+                    }
+                },
+            ),
+            crate::midi::playback::PlaybackState::Paused(track_info) => (
+                PlaybackState::Paused,
+                match track_info {
+                    crate::midi::playback::TrackInfo::Recording(index) => {
+                        Some(PlaybackIdentifier::Recording { index })
+                    }
+                },
+            ),
         };
-        let title = None;
         let duration_milliseconds = playback.get_duration().map(|d| d.as_millis() as u32);
         let position_milliseconds = playback.get_position().as_millis() as u32;
 
         Playback {
             state,
-            title,
+            identifier,
             duration_milliseconds,
             position_milliseconds,
         }

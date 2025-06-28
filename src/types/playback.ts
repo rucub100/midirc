@@ -1,3 +1,13 @@
+export type PlaybackIdentifier =
+  | {
+      type: "recording";
+      index: number;
+    }
+  | {
+      type: "midiFile";
+      path: string;
+    };
+
 export type Playback = (
   | {
       state: "stopped";
@@ -5,9 +15,11 @@ export type Playback = (
   | {
       state: "playing";
       durationMilliseconds: number;
+      identifier: PlaybackIdentifier;
     }
   | {
       state: "paused";
       durationMilliseconds: number;
+      identifier: PlaybackIdentifier;
     }
-) & { title?: string; positionMilliseconds: number };
+) & { positionMilliseconds: number };

@@ -36,6 +36,7 @@ function updatePlayback() {
 function playRecording(index: number) {
   playMidiRecording(index)
     .then((playback) => {
+      console.log("Playback started:", playback);
       globalPlayback.value = playback;
     })
     .catch((error) => {

@@ -92,7 +92,73 @@ impl MidiPlayback {
         Ok(())
     }
 
-    fn load_data(data: &Vec<TimeStampedMidiMessage>) -> Result<Vec<(u64, Vec<u8>)>, String> {
+    pub async fn play(
+        &mut self,
+        data: &Vec<TimeStampedMidiMessage>,
+        track_info: TrackInfo,
+    ) -> Result<(), String> {
+        let buffer = self.load_timestamped_data(data)?;
+        self._play(buffer, track_info).await
+    }
+
+    pub fn pause(&mut self) -> Result<(), String> {
+        let mut inner = self.inner.lock().unwrap();
+
+        inner.state = match inner.state {
+            PlaybackState::Playing(ref track_info) => PlaybackState::Paused(track_info.clone()),
+            _ => return Err("Playback is not active, cannot pause".to_string()),
+        };
+
+        if let Some(signal) = &inner.signal_pause {
+            signal.store(true, Ordering::SeqCst);
+        }
+
+        Ok(())
+    }
+
+    pub fn resume(&mut self) -> Result<(), String> {
+        let mut inner = self.inner.lock().unwrap();
+
+        inner.state = match inner.state {
+            PlaybackState::Paused(ref track_info) => PlaybackState::Playing(track_info.clone()),
+            _ => return Err("Playback is not paused, cannot resume".to_string()),
+        };
+
+        if let Some(signal) = &inner.signal_pause {
+            signal.store(false, Ordering::SeqCst);
+        }
+
+        Ok(())
+    }
+
+    pub async fn stop(&mut self) -> Result<(), String> {
+        let handle = {
+            let mut inner = self.inner.lock().unwrap();
+
+            if let Some(handle) = inner.thread_handle.take() {
+                if let Some(signal_stop) = inner.signal_stop.take() {
+                    signal_stop.store(true, Ordering::SeqCst);
+                }
+
+                Some(handle)
+            } else {
+                None
+            }
+        };
+
+        if let Some(handle) = handle {
+            handle
+                .await
+                .map_err(|e| format!("Failed to join playback thread: {e}"))?;
+        }
+
+        Ok(())
+    }
+
+    fn load_timestamped_data(
+        &mut self,
+        data: &Vec<TimeStampedMidiMessage>,
+    ) -> Result<Vec<(u64, Vec<u8>)>, String> {
         if data.is_empty() {
             return Err("Cannot load empty data".to_string());
         }
@@ -106,6 +172,15 @@ impl MidiPlayback {
                 msg.timestamp_microseconds -= start_timestamp;
             });
         }
+
+        // Set duration
+        {
+            let mut inner = self.inner.lock().unwrap();
+            inner.duration_milliseconds = Some(Arc::new(AtomicUsize::new(
+                (normalized_data.last().unwrap().timestamp_microseconds / 1000) as usize,
+            )));
+        }
+
         // Convert absolute timestamps to relative timestamps (delta)
         let normalized_data = normalized_data
             .iter()
@@ -126,26 +201,19 @@ impl MidiPlayback {
         Ok(normalized_data)
     }
 
-    pub async fn play(
+    async fn _play(
         &mut self,
-        data: &Vec<TimeStampedMidiMessage>,
+        buffer: Vec<(u64, Vec<u8>)>,
         track_info: TrackInfo,
     ) -> Result<(), String> {
         self.stop().await?;
 
-        let mut inner = self.inner.lock().unwrap();
-
-        let buffer = Self::load_data(data)?;
         let signal_stop = Arc::new(AtomicBool::new(false));
         let signal_pause = Arc::new(AtomicBool::new(false));
 
+        let mut inner = self.inner.lock().unwrap();
         inner.state = PlaybackState::Playing(track_info);
         inner.position_milliseconds.store(0, Ordering::SeqCst);
-        inner.duration_milliseconds = Some(Arc::new(AtomicUsize::new(
-            ((data.last().unwrap().timestamp_microseconds
-                - data.first().unwrap().timestamp_microseconds)
-                / 1000) as usize,
-        )));
         inner.signal_stop = Some(signal_stop.clone());
         inner.signal_pause = Some(signal_pause.clone());
 
@@ -221,60 +289,6 @@ impl MidiPlayback {
             inner_clone.thread_handle = None;
         });
         inner.thread_handle = Some(handle);
-
-        Ok(())
-    }
-
-    pub fn pause(&mut self) -> Result<(), String> {
-        let mut inner = self.inner.lock().unwrap();
-
-        inner.state = match inner.state {
-            PlaybackState::Playing(ref track_info) => PlaybackState::Paused(track_info.clone()),
-            _ => return Err("Playback is not active, cannot pause".to_string()),
-        };
-
-        if let Some(signal) = &inner.signal_pause {
-            signal.store(true, Ordering::SeqCst);
-        }
-
-        Ok(())
-    }
-
-    pub fn resume(&mut self) -> Result<(), String> {
-        let mut inner = self.inner.lock().unwrap();
-
-        inner.state = match inner.state {
-            PlaybackState::Paused(ref track_info) => PlaybackState::Playing(track_info.clone()),
-            _ => return Err("Playback is not paused, cannot resume".to_string()),
-        };
-
-        if let Some(signal) = &inner.signal_pause {
-            signal.store(false, Ordering::SeqCst);
-        }
-
-        Ok(())
-    }
-
-    pub async fn stop(&mut self) -> Result<(), String> {
-        let handle = {
-            let mut inner = self.inner.lock().unwrap();
-
-            if let Some(handle) = inner.thread_handle.take() {
-                if let Some(signal_stop) = inner.signal_stop.take() {
-                    signal_stop.store(true, Ordering::SeqCst);
-                }
-
-                Some(handle)
-            } else {
-                None
-            }
-        };
-
-        if let Some(handle) = handle {
-            handle
-                .await
-                .map_err(|e| format!("Failed to join playback thread: {e}"))?;
-        }
 
         Ok(())
     }

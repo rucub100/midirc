@@ -1,5 +1,10 @@
 export type RecordingDuration = { secs: number; nanos: number };
 
+export type Recording = {
+  index: number;
+  durationMilliseconds: number;
+};
+
 export type Recorder = (
   | {
       state: "stopped";
@@ -7,4 +12,4 @@ export type Recorder = (
   | {
       state: "recording";
     }
-) & { recordings: any[] };
+) & { recordings: Recording[] };
