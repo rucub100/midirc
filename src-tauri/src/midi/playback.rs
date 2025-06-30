@@ -1,7 +1,7 @@
 use std::{
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     thread::{self},
     time::{Duration, Instant},
@@ -135,14 +135,15 @@ impl MidiPlayback {
         let handle = {
             let mut inner = self.inner.lock().unwrap();
 
-            if let Some(handle) = inner.thread_handle.take() {
-                if let Some(signal_stop) = inner.signal_stop.take() {
-                    signal_stop.store(true, Ordering::SeqCst);
-                }
+            match inner.thread_handle.take() {
+                Some(handle) => {
+                    if let Some(signal_stop) = inner.signal_stop.take() {
+                        signal_stop.store(true, Ordering::SeqCst);
+                    }
 
-                Some(handle)
-            } else {
-                None
+                    Some(handle)
+                }
+                _ => None,
             }
         };
 

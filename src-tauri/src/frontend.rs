@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::midi::{playback::MidiPlayback, MidiStateInner};
+use crate::midi::{MidiStateInner, playback::MidiPlayback};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]

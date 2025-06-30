@@ -3,7 +3,7 @@ name = "midirc"
 version = "0.1.0"
 description = "Transform your digital instrument experience. With midirc, a powerful Tauri and Rust desktop application, empowering you to connect, record, play back, and interact with your digital piano or any MIDI instrument. Unlock new creative possibilities and enhance your musical journey."
 authors = ["Ruslan Curbanov"]
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

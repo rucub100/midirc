@@ -1,11 +1,11 @@
 use tauri::Manager;
 
 use midi::{
+    MidiState,
     commands::{
         connect_midi_input, connect_midi_output, disconnect_midi_input, disconnect_midi_output,
         get_midi, scan_midi_input, scan_midi_output,
     },
-    MidiState,
 };
 
 use crate::midi::commands::{
