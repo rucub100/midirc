@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import {
+  deleteMidiRecording,
   getRecorder,
   startMidiRecording,
   stopMidiRecording,
@@ -47,10 +48,23 @@ function stopRecording() {
     });
 }
 
+function deleteRecording(index: number) {
+  deleteMidiRecording(index)
+    .then((recorder) => {
+      console.log("MIDI recording deleted:", recorder);
+      globalRecorder.value = recorder;
+    })
+    .catch((error) => {
+      console.error("Error deleting MIDI recording:", error);
+      globalRecorder.value = defaultRecorder;
+    });
+}
+
 export function useRecorder() {
   return {
     recorder: globalRecorder,
     startRecording,
     stopRecording,
+    deleteRecording,
   };
 }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { confirm } from '@tauri-apps/plugin-dialog';
 import RecorderControls from '../components/recorder/RecorderControls.vue';
 import PlaybackControls from '../components/recorder/PlaybackControls.vue';
 import Recording from '../components/recorder/Recording.vue';
@@ -6,8 +7,19 @@ import { usePlayback } from '../hooks/use-playback';
 import { useRecorder } from '../hooks/use-recorder';
 import RecorderView from '../components/recorder/RecorderView.vue';
 
-const { recorder, startRecording, stopRecording } = useRecorder();
+const { recorder, startRecording, stopRecording, deleteRecording } = useRecorder();
 const { playback, playRecording, pausePlayback, resumePlayback, stopPlayback, updatePlayback } = usePlayback();
+
+function handleDeleteRecording(index: number) {
+    confirm(
+        'Are you sure you want to delete this recording?',
+        { title: 'Delete recording?' }
+    ).then((confirmed) => {
+        if (confirmed) {
+            deleteRecording(index);
+        }
+    });
+}
 </script>
 
 <template>
@@ -24,8 +36,9 @@ const { playback, playRecording, pausePlayback, resumePlayback, stopPlayback, up
         <div v-else class="flex flex-col">
             <h1 class="mb-2">Recordings</h1>
             <div class="flex flex-col gap-2">
-                <template v-for="recording in recorder.recordings" :key="index">
-                    <Recording :recording="recording" @play="playRecording(recording.index)"></Recording>
+                <template v-for="recording in recorder.recordings" :key="recording.index">
+                    <Recording :recording="recording" @play="playRecording(recording.index)"
+                        @delete="handleDeleteRecording(recording.index)"></Recording>
                 </template>
             </div>
         </div>

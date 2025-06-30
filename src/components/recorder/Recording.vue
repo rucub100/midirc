@@ -15,6 +15,8 @@ const duration = computed(() => { return formatDuration(props.recording.duration
 
 const emit = defineEmits<{
     (e: 'play'): void
+    (e: 'save'): void
+    (e: 'delete'): void
 }>();
 </script>
 
@@ -23,7 +25,7 @@ const emit = defineEmits<{
         <IconButton icon="play_arrow" @click="emit('play')" class="p-2"></IconButton>
         <h2>Recording #{{ recording.index + 1 }}</h2>
         <span class="px-4">{{ duration }}</span>
-        <IconButton icon="file_save"></IconButton>
-        <IconButton icon="delete" class="px-2"></IconButton>
+        <IconButton icon="file_save" @click="emit('save')"></IconButton>
+        <IconButton icon="delete" class="px-2" @click="emit('delete')"></IconButton>
     </div>
 </template>

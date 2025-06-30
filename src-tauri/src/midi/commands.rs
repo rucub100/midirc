@@ -124,6 +124,19 @@ pub async fn stop_midi_recording<'a>(
 }
 
 #[tauri::command]
+pub async fn delete_midi_recording<'a>(
+    index: usize,
+    state: tauri::State<'a, MidiState>,
+) -> Result<Recorder, String> {
+    let midi = state.lock().await;
+
+    let mut recorder = midi.recorder.lock().unwrap();
+    recorder.remove_recording(index)?;
+
+    Ok((&*recorder).into())
+}
+
+#[tauri::command]
 pub async fn get_midi_playback<'a>(state: tauri::State<'a, MidiState>) -> Result<Playback, String> {
     let midi = state.lock().await;
     let playback = midi.playback.lock().await;

@@ -9,9 +9,9 @@ use midi::{
 };
 
 use crate::midi::commands::{
-    get_midi_playback, get_midi_recorder, pause_midi_playback, play_midi_recording,
-    register_midi_channel, resume_midi_playback, send_midi_message, start_midi_recording,
-    stop_midi_playback, stop_midi_recording,
+    delete_midi_recording, get_midi_playback, get_midi_recorder, pause_midi_playback,
+    play_midi_recording, register_midi_channel, resume_midi_playback, send_midi_message,
+    start_midi_recording, stop_midi_playback, stop_midi_recording,
 };
 
 mod frontend;
@@ -20,6 +20,7 @@ mod midi;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(MidiState::default())
         .invoke_handler(tauri::generate_handler![
@@ -35,6 +36,7 @@ pub fn run() {
             get_midi_recorder,
             start_midi_recording,
             stop_midi_recording,
+            delete_midi_recording,
             get_midi_playback,
             play_midi_recording,
             pause_midi_playback,
