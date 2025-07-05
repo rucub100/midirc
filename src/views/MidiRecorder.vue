@@ -7,8 +7,15 @@ import { usePlayback } from '../hooks/use-playback';
 import { useRecorder } from '../hooks/use-recorder';
 import RecorderView from '../components/recorder/RecorderView.vue';
 
-const { recorder, startRecording, stopRecording, deleteRecording } = useRecorder();
+const { recorder, startRecording, stopRecording, saveRecording, deleteRecording } = useRecorder();
 const { playback, playRecording, pausePlayback, resumePlayback, stopPlayback, updatePlayback } = usePlayback();
+
+function handleSaveRecording(index: number) {
+    // FIXME: https://vuejs.org/examples/#modal
+    // we need to be able to change some properties for the export
+    // e.g. tempo, time signature, etc.
+    saveRecording(index);
+}
 
 function handleDeleteRecording(index: number) {
     confirm(
@@ -38,7 +45,8 @@ function handleDeleteRecording(index: number) {
             <div class="flex flex-col gap-2">
                 <template v-for="recording in recorder.recordings" :key="recording.index">
                     <Recording :recording="recording" @play="playRecording(recording.index)"
-                        @delete="handleDeleteRecording(recording.index)"></Recording>
+                        @save="handleSaveRecording(recording.index)" @delete="handleDeleteRecording(recording.index)">
+                    </Recording>
                 </template>
             </div>
         </div>

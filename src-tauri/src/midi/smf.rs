@@ -24,6 +24,12 @@ pub enum MidiDivision {
     TimeCode(FramesPerSecond, u8),
 }
 
+impl Default for MidiDivision {
+    fn default() -> Self {
+        MidiDivision::TicksPerQuarterNote(96)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum MusicalScale {
     Major,
@@ -73,8 +79,8 @@ pub enum Event {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MidiTrackEvent {
-    delta_time: u32,
-    event: Event,
+    pub delta_time: u32,
+    pub event: Event,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -88,6 +94,19 @@ pub struct MidiHeader {
 pub struct MidiFile {
     header: MidiHeader,
     tracks: Vec<Vec<MidiTrackEvent>>,
+}
+
+impl MidiFile {
+    pub fn new_single_multi_channel_track(track: Vec<MidiTrackEvent>) -> MidiFile {
+        MidiFile {
+            header: MidiHeader {
+                format: MidiFormat::SingleMultiChannelTrack,
+                num_tracks: 1,
+                division: MidiDivision::default(),
+            },
+            tracks: vec![track],
+        }
+    }
 }
 
 fn to_var_length_bytes(value: u32) -> Result<Vec<u8>, String> {

@@ -1,9 +1,14 @@
 use tauri::ipc::Channel;
+use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use super::MidiState;
 use crate::{
     frontend::{Midi, Playback, Recorder},
-    midi::{message::MidiMessage, playback::TrackInfo},
+    midi::{
+        message::MidiMessage,
+        playback::TrackInfo,
+        smf::{Event, MidiFile, MidiTrackEvent},
+    },
 };
 
 #[tauri::command]
@@ -121,6 +126,47 @@ pub async fn stop_midi_recording<'a>(
     recorder.stop_recording()?;
 
     Ok((&*recorder).into())
+}
+
+#[tauri::command]
+pub async fn save_midi_recording<'a>(
+    index: usize,
+    app: tauri::AppHandle,
+    state: tauri::State<'a, MidiState>,
+) -> Result<(), String> {
+    let file_path = app
+        .dialog()
+        .file()
+        .add_filter("Standard MIDI Files", &["mid"])
+        .blocking_save_file();
+
+    let recording = {
+        let midi = state.lock().await;
+        let recorder = midi.recorder.lock().unwrap();
+        let recording = recorder
+            .get_recordings()
+            .get(index)
+            .ok_or_else(|| format!("Recording with index {} not found", index))?;
+        recording.clone()
+    };
+    let track = recording
+        .iter()
+        .map(|msg| MidiTrackEvent {
+            delta_time: msg.timestamp_microseconds as u32,
+            event: Event::MidiEvent(msg.message.clone()),
+        })
+        .collect::<Vec<MidiTrackEvent>>();
+    let midi_file = MidiFile::new_single_multi_channel_track(track);
+    let midi_bytes: Vec<u8> = (&midi_file).try_into()?;
+
+    if let Some(path) = file_path
+        && let FilePath::Path(path_buf) = path
+    {
+        std::fs::write(path_buf, midi_bytes)
+            .map_err(|e| format!("Failed to write MIDI file: {}", e))?;
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
