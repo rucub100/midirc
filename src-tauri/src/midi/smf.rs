@@ -176,11 +176,8 @@ pub struct MidiFile {
 }
 
 impl MidiFile {
-    pub fn new(header: MidiHeader, track: MidiTrack) -> MidiFile {
-        MidiFile {
-            header,
-            tracks: vec![track],
-        }
+    pub fn new(header: MidiHeader, tracks: Vec<MidiTrack>) -> MidiFile {
+        MidiFile { header, tracks }
     }
 }
 

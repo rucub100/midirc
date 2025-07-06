@@ -140,25 +140,26 @@ pub async fn save_midi_recording<'a>(
         .add_filter("Standard MIDI Files", &["mid"])
         .blocking_save_file();
 
-    let recording = {
-        let midi = state.lock().await;
-        let recorder = midi.recorder.lock().unwrap();
-        let recording = recorder
-            .get_recordings()
-            .get(index)
-            .ok_or_else(|| format!("Recording with index {} not found", index))?;
-        recording.clone()
-    };
-    let tempo = 500_000;
-    let midi_header = MidiHeader::single_multi_channel_track();
-    let track = MidiTrack::from_time_stamped_messages(recording, tempo, midi_header.get_division());
-
-    let midi_file = MidiFile::new(midi_header, track);
-    let midi_bytes: Vec<u8> = (&midi_file).try_into()?;
-
     if let Some(path) = file_path
         && let FilePath::Path(path_buf) = path
     {
+        let recording = {
+            let midi = state.lock().await;
+            let recorder = midi.recorder.lock().unwrap();
+            let recording = recorder
+                .get_recordings()
+                .get(index)
+                .ok_or_else(|| format!("Recording with index {} not found", index))?;
+            recording.clone()
+        };
+        let tempo = 500_000;
+        let midi_header = MidiHeader::single_multi_channel_track();
+        let track =
+            MidiTrack::from_time_stamped_messages(recording, tempo, midi_header.get_division());
+
+        let midi_file = MidiFile::new(midi_header, vec![track]);
+        let midi_bytes: Vec<u8> = (&midi_file).try_into()?;
+
         std::fs::write(path_buf, midi_bytes)
             .map_err(|e| format!("Failed to write MIDI file: {}", e))?;
     }
