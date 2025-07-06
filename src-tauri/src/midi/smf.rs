@@ -1,4 +1,6 @@
-use crate::midi::message::{MidiChannel, MidiMessage};
+use std::ops::{Deref, DerefMut};
+
+use super::message::{MidiChannel, MidiMessage, TimeStampedMidiMessage};
 
 const MIDI_HEADER_CHUNK_ASCII_TYPE: &[u8; 4] = b"MThd";
 const MIDI_TRACK_CHUNK_ASCII_TYPE: &[u8; 4] = b"MTrk";
@@ -90,20 +92,93 @@ pub struct MidiHeader {
     division: MidiDivision,
 }
 
+impl MidiHeader {
+    pub fn single_multi_channel_track() -> MidiHeader {
+        MidiHeader {
+            format: MidiFormat::SingleMultiChannelTrack,
+            num_tracks: 1,
+            division: MidiDivision::default(),
+        }
+    }
+
+    pub fn get_format(&self) -> &MidiFormat {
+        &self.format
+    }
+
+    pub fn get_num_tracks(&self) -> u16 {
+        self.num_tracks
+    }
+
+    pub fn get_division(&self) -> &MidiDivision {
+        &self.division
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MidiTrack(Vec<MidiTrackEvent>);
+
+impl Deref for MidiTrack {
+    type Target = Vec<MidiTrackEvent>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for MidiTrack {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl MidiTrack {
+    pub fn from_time_stamped_messages(
+        data: Vec<TimeStampedMidiMessage>,
+        tempo: u32,
+        division: &MidiDivision,
+    ) -> MidiTrack {
+        if data.is_empty() {
+            return MidiTrack(vec![]);
+        }
+
+        let mut normalized_data = data.clone();
+        normalized_data.sort_by_key(|msg| msg.timestamp_microseconds);
+        let start_timestamp = normalized_data.first().unwrap().timestamp_microseconds;
+        normalized_data.iter_mut().for_each(|msg| {
+            msg.timestamp_microseconds -= start_timestamp;
+        });
+        for index in (1..normalized_data.len()).rev() {
+            normalized_data[index].timestamp_microseconds -=
+                normalized_data[index - 1].timestamp_microseconds;
+        }
+
+        let track_data = std::iter::once(MidiTrackEvent {
+            delta_time: 0,
+            event: Event::MetaEvent(MetaEvent::SetTempo(tempo)),
+        })
+        .chain(normalized_data.into_iter().map(|msg| MidiTrackEvent {
+            delta_time: calc_delta_time(msg.timestamp_microseconds, tempo, division),
+            event: Event::MidiEvent(msg.message),
+        }))
+        .chain(std::iter::once(MidiTrackEvent {
+            delta_time: 0,
+            event: Event::MetaEvent(MetaEvent::EndOfTrack),
+        }))
+        .collect();
+
+        MidiTrack(track_data)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct MidiFile {
     header: MidiHeader,
-    tracks: Vec<Vec<MidiTrackEvent>>,
+    tracks: Vec<MidiTrack>,
 }
 
 impl MidiFile {
-    pub fn new_single_multi_channel_track(track: Vec<MidiTrackEvent>) -> MidiFile {
+    pub fn new(header: MidiHeader, track: MidiTrack) -> MidiFile {
         MidiFile {
-            header: MidiHeader {
-                format: MidiFormat::SingleMultiChannelTrack,
-                num_tracks: 1,
-                division: MidiDivision::default(),
-            },
+            header,
             tracks: vec![track],
         }
     }
@@ -333,6 +408,25 @@ fn calc_delta_time_microseconds(delta: u32, tempo: u32, division: &MidiDivision)
             }
         }
     }
+}
+
+pub fn calc_delta_time(microseconds: u64, tempo: u32, division: &MidiDivision) -> u32 {
+    let tempo_u64 = tempo as u64;
+    let delta_u64 = match division {
+        MidiDivision::TicksPerQuarterNote(ticks) => microseconds * (*ticks as u64) / tempo_u64,
+        MidiDivision::TimeCode(frames_per_second, ticks) => {
+            let ticks_u64 = *ticks as u64;
+
+            match frames_per_second {
+                FramesPerSecond::Fps25 => microseconds * 25 * ticks_u64 / 1_000_000,
+                FramesPerSecond::Fps24 => microseconds * 24 * ticks_u64 / 1_000_000,
+                FramesPerSecond::Fps30 => microseconds * 3 * ticks_u64 / 100_000,
+                FramesPerSecond::Fps30DropFrame => microseconds * 3 * ticks_u64 / 100_100,
+            }
+        }
+    };
+
+    delta_u64 as u32
 }
 
 fn parse_midi_file_header(data: &[u8]) -> Result<MidiHeader, String> {
@@ -601,7 +695,7 @@ fn parse_midi_track_event(data: &[u8], running_status: Option<u8>) -> Result<(Ev
     }
 }
 
-fn parse_midi_file_track(data: &[u8], offset: &mut usize) -> Result<Vec<MidiTrackEvent>, String> {
+fn parse_midi_file_track(data: &[u8], offset: &mut usize) -> Result<MidiTrack, String> {
     if data.len() <= *offset + 8 {
         return Err("Data is too short for MIDI track chunk".to_string());
     }
@@ -627,7 +721,7 @@ fn parse_midi_file_track(data: &[u8], offset: &mut usize) -> Result<Vec<MidiTrac
     let track_data = &data[*offset..*offset + track_length as usize];
     *offset += track_length as usize;
 
-    let mut track: Vec<MidiTrackEvent> = Vec::new();
+    let mut track: MidiTrack = MidiTrack(Vec::new());
 
     let mut track_offset = 0;
     let mut running_status: Option<u8> = None;
@@ -741,7 +835,7 @@ impl TryFrom<&MidiFile> for Vec<u8> {
 
             let mut end_of_track = false;
             let mut running_status: Option<u8> = None;
-            for event in track {
+            for event in track.iter() {
                 if end_of_track {
                     return Err("Track contains events after End of Track".to_string());
                 }
@@ -939,7 +1033,7 @@ mod tests {
                 num_tracks: 1,
                 division: MidiDivision::TicksPerQuarterNote(96),
             },
-            tracks: vec![vec![
+            tracks: vec![MidiTrack(vec![
                 MidiTrackEvent {
                     delta_time: 0,
                     event: Event::MetaEvent(MetaEvent::TimeSignature {
@@ -1026,7 +1120,7 @@ mod tests {
                     delta_time: 0,
                     event: Event::MetaEvent(MetaEvent::EndOfTrack),
                 },
-            ]],
+            ])],
         };
 
         let serialized = Vec::try_from(&midi_file).unwrap();

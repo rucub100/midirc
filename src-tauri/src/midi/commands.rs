@@ -7,7 +7,7 @@ use crate::{
     midi::{
         message::MidiMessage,
         playback::TrackInfo,
-        smf::{Event, MidiFile, MidiTrackEvent},
+        smf::{Event, MetaEvent, MidiFile, MidiHeader, MidiTrack, MidiTrackEvent, calc_delta_time},
     },
 };
 
@@ -149,14 +149,11 @@ pub async fn save_midi_recording<'a>(
             .ok_or_else(|| format!("Recording with index {} not found", index))?;
         recording.clone()
     };
-    let track = recording
-        .iter()
-        .map(|msg| MidiTrackEvent {
-            delta_time: msg.timestamp_microseconds as u32,
-            event: Event::MidiEvent(msg.message.clone()),
-        })
-        .collect::<Vec<MidiTrackEvent>>();
-    let midi_file = MidiFile::new_single_multi_channel_track(track);
+    let tempo = 500_000;
+    let midi_header = MidiHeader::single_multi_channel_track();
+    let track = MidiTrack::from_time_stamped_messages(recording, tempo, midi_header.get_division());
+
+    let midi_file = MidiFile::new(midi_header, track);
     let midi_bytes: Vec<u8> = (&midi_file).try_into()?;
 
     if let Some(path) = file_path
