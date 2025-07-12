@@ -129,9 +129,17 @@ pub enum PlaybackIdentifier {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct Track {
+    index: usize,
+    duration_milliseconds: u32,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct Playback {
     pub state: PlaybackState,
     pub identifier: Option<PlaybackIdentifier>,
+    pub tracks: Vec<Track>,
     pub duration_milliseconds: Option<u32>,
     pub position_milliseconds: u32,
 }
@@ -147,6 +155,11 @@ impl From<&MidiPlayback> for Playback {
                     crate::midi::playback::TrackInfo::Recording(index) => {
                         Some(PlaybackIdentifier::Recording { index })
                     }
+                    crate::midi::playback::TrackInfo::StandardMidiFile(index) => {
+                        Some(PlaybackIdentifier::MidiFile {
+                            path: format!("Track {}", index),
+                        })
+                    }
                 },
             ),
             crate::midi::playback::PlaybackState::Paused(track_info) => (
@@ -155,15 +168,31 @@ impl From<&MidiPlayback> for Playback {
                     crate::midi::playback::TrackInfo::Recording(index) => {
                         Some(PlaybackIdentifier::Recording { index })
                     }
+                    crate::midi::playback::TrackInfo::StandardMidiFile(index) => {
+                        Some(PlaybackIdentifier::MidiFile {
+                            path: format!("Track {}", index),
+                        })
+                    }
                 },
             ),
         };
+        let src_tracks = playback.get_tracks();
+        let tracks = src_tracks
+            .iter()
+            .enumerate()
+            .map(|(index, track)| Track {
+                duration_milliseconds: track.into_iter().map(|(delta, _)| delta).sum::<u64>()
+                    as u32,
+                index,
+            })
+            .collect();
         let duration_milliseconds = playback.get_duration().map(|d| d.as_millis() as u32);
         let position_milliseconds = playback.get_position().as_millis() as u32;
 
         Playback {
             state,
             identifier,
+            tracks,
             duration_milliseconds,
             position_milliseconds,
         }

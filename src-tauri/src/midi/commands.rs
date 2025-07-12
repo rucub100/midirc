@@ -7,7 +7,7 @@ use crate::{
     midi::{
         message::MidiMessage,
         playback::TrackInfo,
-        smf::{Event, MetaEvent, MidiFile, MidiHeader, MidiTrack, MidiTrackEvent, calc_delta_time},
+        smf::{MidiFile, MidiHeader, MidiTrack},
     },
 };
 
@@ -208,6 +208,62 @@ pub async fn play_midi_recording<'a>(
     playback
         .play(&recording, TrackInfo::Recording(index))
         .await?;
+
+    Ok((&*playback).into())
+}
+
+#[tauri::command]
+pub async fn load_midi_track<'a>(
+    app: tauri::AppHandle,
+    state: tauri::State<'a, MidiState>,
+) -> Result<Playback, String> {
+    let file_path = app
+        .dialog()
+        .file()
+        .add_filter("Standard MIDI Files", &["mid"])
+        .blocking_pick_file();
+
+    let midi = state.lock().await;
+    let mut playback = midi.playback.lock().await;
+
+    if let Some(path) = file_path
+        && let FilePath::Path(path_buf) = path
+    {
+        let result =
+            std::fs::read(path_buf).map_err(|e| format!("Failed to read MIDI file: {}", e));
+        let midi_bytes = result.unwrap();
+        let midi_file: MidiFile = midi_bytes
+            .as_slice()
+            .try_into()
+            .map_err(|e| format!("Failed to parse MIDI file: {}", e))?;
+        playback.load_track(midi_file)?;
+    }
+
+    Ok((&*playback).into())
+}
+
+#[tauri::command]
+pub async fn play_midi_track<'a>(
+    index: usize,
+    state: tauri::State<'a, MidiState>,
+) -> Result<Playback, String> {
+    let midi = state.lock().await;
+
+    let mut playback = midi.playback.lock().await;
+    playback.play_track(index).await?;
+
+    Ok((&*playback).into())
+}
+
+#[tauri::command]
+pub async fn eject_midi_track<'a>(
+    index: usize,
+    state: tauri::State<'a, MidiState>,
+) -> Result<Playback, String> {
+    let midi = state.lock().await;
+
+    let mut playback = midi.playback.lock().await;
+    playback.eject_track(index).await?;
 
     Ok((&*playback).into())
 }

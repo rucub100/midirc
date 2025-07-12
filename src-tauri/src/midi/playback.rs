@@ -1,4 +1,6 @@
 use std::{
+    ops::{Deref, DerefMut},
+    slice::Iter,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -9,15 +11,62 @@ use std::{
 
 use tauri::async_runtime::JoinHandle;
 
-use crate::midi::message::{MidiChannel, MidiMessage, TimeStampedMidiMessage};
+use crate::midi::{
+    message::{MidiChannel, MidiMessage, TimeStampedMidiMessage},
+    smf::{Event, MidiFile, calc_delta_time_microseconds},
+};
 
 type MidiPlayerFn = Arc<dyn Fn(&[u8]) -> Result<(), String> + Sync + Send + 'static>;
 
 const MAX_SLEEP_DURATION: Duration = Duration::from_millis(50);
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Track(Vec<(u64, Vec<u8>)>);
+
+impl Deref for Track {
+    type Target = Vec<(u64, Vec<u8>)>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Track {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl IntoIterator for Track {
+    type Item = (u64, Vec<u8>);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Track {
+    type Item = &'a (u64, Vec<u8>);
+    type IntoIter = std::slice::Iter<'a, (u64, Vec<u8>)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Track {
+    type Item = &'a mut (u64, Vec<u8>);
+    type IntoIter = std::slice::IterMut<'a, (u64, Vec<u8>)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter_mut()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TrackInfo {
     Recording(usize),
+    StandardMidiFile(usize),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -30,6 +79,7 @@ pub enum PlaybackState {
 pub struct MidiPlaybackInner {
     state: PlaybackState,
     player: Option<MidiPlayerFn>,
+    tracks: Vec<Track>,
     position_milliseconds: Arc<AtomicUsize>,
     duration_milliseconds: Option<Arc<AtomicUsize>>,
     // Thread management
@@ -48,6 +98,7 @@ impl Default for MidiPlayback {
             inner: Arc::new(Mutex::new(MidiPlaybackInner {
                 state: PlaybackState::Stopped,
                 player: None,
+                tracks: Vec::new(),
                 position_milliseconds: Arc::new(AtomicUsize::new(0)),
                 duration_milliseconds: None,
                 thread_handle: None,
@@ -77,6 +128,11 @@ impl MidiPlayback {
         Duration::from_millis(inner.position_milliseconds.load(Ordering::SeqCst) as u64)
     }
 
+    pub fn get_tracks(&self) -> Vec<Track> {
+        let inner = self.inner.lock().unwrap();
+        inner.tracks.clone()
+    }
+
     pub fn set_player<F>(&mut self, player: F) -> Result<(), String>
     where
         F: Fn(&[u8]) -> Result<(), String> + Sync + Send + 'static,
@@ -99,6 +155,54 @@ impl MidiPlayback {
     ) -> Result<(), String> {
         let buffer = self.load_timestamped_data(data)?;
         self._play(buffer, track_info).await
+    }
+
+    pub fn load_track(&mut self, file: MidiFile) -> Result<(), String> {
+        let mut inner = self.inner.lock().unwrap();
+
+        if file.get_tracks().is_empty() {
+            return Err("Cannot load empty MIDI file".to_string());
+        }
+
+        for track in file.get_tracks() {
+            inner.tracks.push(Track(
+                track
+                    .iter()
+                    .filter_map(|msg| match msg.event {
+                        Event::MidiEvent(ref midi_message) => {
+                            // FIXME: handle tempo changes and other meta events
+                            Some((
+                                calc_delta_time_microseconds(
+                                    msg.delta_time,
+                                    500_000,
+                                    file.get_header().get_division(),
+                                ) / 1000,
+                                midi_message.clone().into(),
+                            ))
+                        }
+                        _ => None,
+                    })
+                    .collect(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    pub async fn eject_track(&mut self, index: usize) -> Result<(), String> {
+        let mut inner = self.inner.lock().unwrap();
+        if index < inner.tracks.len() {
+            inner.tracks.remove(index);
+            // FIXME: reset state?
+            Ok(())
+        } else {
+            Err("Track index out of bounds".to_string())
+        }
+    }
+
+    pub async fn play_track(&mut self, index: usize) -> Result<(), String> {
+        let buffer = self._load_track(index)?;
+        self._play(buffer, TrackInfo::StandardMidiFile(index)).await
     }
 
     pub fn pause(&mut self) -> Result<(), String> {
@@ -156,10 +260,19 @@ impl MidiPlayback {
         Ok(())
     }
 
+    fn _load_track(&self, index: usize) -> Result<Track, String> {
+        let inner = self.inner.lock().unwrap();
+        if index < inner.tracks.len() {
+            Ok(inner.tracks[index].clone())
+        } else {
+            Err("Track index out of bounds".to_string())
+        }
+    }
+
     fn load_timestamped_data(
         &mut self,
         data: &Vec<TimeStampedMidiMessage>,
-    ) -> Result<Vec<(u64, Vec<u8>)>, String> {
+    ) -> Result<Track, String> {
         if data.is_empty() {
             return Err("Cannot load empty data".to_string());
         }
@@ -199,14 +312,10 @@ impl MidiPlayback {
             })
             .collect();
 
-        Ok(normalized_data)
+        Ok(Track(normalized_data))
     }
 
-    async fn _play(
-        &mut self,
-        buffer: Vec<(u64, Vec<u8>)>,
-        track_info: TrackInfo,
-    ) -> Result<(), String> {
+    async fn _play(&mut self, buffer: Track, track_info: TrackInfo) -> Result<(), String> {
         self.stop().await?;
 
         let signal_stop = Arc::new(AtomicBool::new(false));

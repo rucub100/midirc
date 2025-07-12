@@ -9,9 +9,10 @@ use midi::{
 };
 
 use crate::midi::commands::{
-    delete_midi_recording, get_midi_playback, get_midi_recorder, pause_midi_playback,
-    play_midi_recording, register_midi_channel, resume_midi_playback, save_midi_recording,
-    send_midi_message, start_midi_recording, stop_midi_playback, stop_midi_recording,
+    delete_midi_recording, eject_midi_track, get_midi_playback, get_midi_recorder, load_midi_track,
+    pause_midi_playback, play_midi_recording, play_midi_track, register_midi_channel,
+    resume_midi_playback, save_midi_recording, send_midi_message, start_midi_recording,
+    stop_midi_playback, stop_midi_recording,
 };
 
 mod frontend;
@@ -43,6 +44,9 @@ pub fn run() {
             pause_midi_playback,
             resume_midi_playback,
             stop_midi_playback,
+            load_midi_track,
+            play_midi_track,
+            eject_midi_track,
         ])
         .setup(|app| {
             #[cfg(debug_assertions)] // only include this code on debug builds

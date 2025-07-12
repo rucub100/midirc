@@ -8,7 +8,7 @@ import { useRecorder } from '../hooks/use-recorder';
 import RecorderView from '../components/recorder/RecorderView.vue';
 
 const { recorder, startRecording, stopRecording, saveRecording, deleteRecording } = useRecorder();
-const { playback, playRecording, pausePlayback, resumePlayback, stopPlayback, updatePlayback } = usePlayback();
+const { playback, playRecording, pausePlayback, resumePlayback, stopPlayback, updatePlayback, loadTrack } = usePlayback();
 
 function handleSaveRecording(index: number) {
     // FIXME: https://vuejs.org/examples/#modal
@@ -35,7 +35,7 @@ function handleDeleteRecording(index: number) {
             <RecorderControls :state="recorder.state" @start-recording="startRecording" @stop-recording="stopRecording">
             </RecorderControls>
             <PlaybackControls :playback="playback" @pause="pausePlayback" @resume="resumePlayback" @stop="stopPlayback"
-                @end="updatePlayback">
+                @load="loadTrack" @end="updatePlayback">
             </PlaybackControls>
         </div>
         <RecorderView></RecorderView>

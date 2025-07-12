@@ -5,6 +5,9 @@ import {
   playMidiRecording,
   resumeMidiPlayback,
   stopMidiPlayback,
+  loadMidiTrack,
+  playMidiTrack,
+  ejectMidiTrack,
 } from "../tauri/playback-commands";
 import { Playback } from "../types/playback";
 
@@ -33,6 +36,28 @@ function updatePlayback() {
     });
 }
 
+function loadTrack() {
+  loadMidiTrack()
+    .then((playback) => {
+      console.log("Track loaded:", playback);
+      globalPlayback.value = playback;
+    })
+    .catch((error) => {
+      console.error("Error loading MIDI track:", error);
+    });
+}
+
+function ejectTrack(index: number) {
+  ejectMidiTrack(index)
+    .then((playback) => {
+      console.log("Track ejected:", playback);
+      globalPlayback.value = playback;
+    })
+    .catch((error) => {
+      console.error("Error ejecting MIDI track:", error);
+    });
+}
+
 function playRecording(index: number) {
   playMidiRecording(index)
     .then((playback) => {
@@ -41,6 +66,17 @@ function playRecording(index: number) {
     })
     .catch((error) => {
       console.error("Error playing MIDI recording:", error);
+    });
+}
+
+function playTrack(index: number) {
+  playMidiTrack(index)
+    .then((playback) => {
+      console.log("Track playback started:", playback);
+      globalPlayback.value = playback;
+    })
+    .catch((error) => {
+      console.error("Error playing MIDI track:", error);
     });
 }
 
@@ -82,5 +118,8 @@ export function usePlayback() {
     pausePlayback,
     resumePlayback,
     stopPlayback,
+    loadTrack,
+    playTrack,
+    ejectTrack,
   };
 }

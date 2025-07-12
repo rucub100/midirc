@@ -179,6 +179,14 @@ impl MidiFile {
     pub fn new(header: MidiHeader, tracks: Vec<MidiTrack>) -> MidiFile {
         MidiFile { header, tracks }
     }
+
+    pub fn get_header(&self) -> &MidiHeader {
+        &self.header
+    }
+
+    pub fn get_tracks(&self) -> &[MidiTrack] {
+        &self.tracks
+    }
 }
 
 fn to_var_length_bytes(value: u32) -> Result<Vec<u8>, String> {
@@ -387,7 +395,7 @@ fn get_event_length(data: &[u8], running_status_length: Option<u8>) -> Result<us
     })
 }
 
-fn calc_delta_time_microseconds(delta: u32, tempo: u32, division: &MidiDivision) -> u64 {
+pub fn calc_delta_time_microseconds(delta: u32, tempo: u32, division: &MidiDivision) -> u64 {
     let delta_u64 = delta as u64;
     let tempo_u64 = tempo as u64;
 
@@ -748,7 +756,7 @@ fn parse_midi_file_track(data: &[u8], offset: &mut usize) -> Result<MidiTrack, S
             _ => false,
         };
 
-        if is_sysex {
+        if !is_sysex {
             track.push(MidiTrackEvent {
                 delta_time: delta,
                 event: event.clone(),
