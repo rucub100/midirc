@@ -176,7 +176,7 @@ impl MidiPlayback {
                                     msg.delta_time,
                                     500_000,
                                     file.get_header().get_division(),
-                                ) / 1000,
+                                ),
                                 midi_message.clone().into(),
                             ))
                         }
@@ -260,10 +260,14 @@ impl MidiPlayback {
         Ok(())
     }
 
-    fn _load_track(&self, index: usize) -> Result<Track, String> {
-        let inner = self.inner.lock().unwrap();
+    fn _load_track(&mut self, index: usize) -> Result<Track, String> {
+        let mut inner = self.inner.lock().unwrap();
         if index < inner.tracks.len() {
-            Ok(inner.tracks[index].clone())
+            let track = inner.tracks[index].clone();
+            inner.duration_milliseconds = Some(Arc::new(AtomicUsize::new(
+                (track.iter().map(|(delta, _)| delta).sum::<u64>() / 1000) as usize,
+            )));
+            Ok(track)
         } else {
             Err("Track index out of bounds".to_string())
         }

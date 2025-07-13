@@ -31,6 +31,7 @@ const durationTime = computed(() => {
 watch(() => props.playback, (playback, _prevPlayback, onCleanup) => {
     switch (playback.state) {
         case 'playing':
+            console.log('Playback started', playback);
             const startPositionMs = playback.positionMilliseconds;
             const durationMs = playback.durationMilliseconds;
             progress.value = startPositionMs / durationMs * 100;

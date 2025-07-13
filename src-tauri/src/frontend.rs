@@ -181,7 +181,7 @@ impl From<&MidiPlayback> for Playback {
             .iter()
             .enumerate()
             .map(|(index, track)| Track {
-                duration_milliseconds: track.into_iter().map(|(delta, _)| delta).sum::<u64>()
+                duration_milliseconds: (track.iter().map(|(delta, _)| delta).sum::<u64>() / 1000)
                     as u32,
                 index,
             })

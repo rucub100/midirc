@@ -8,6 +8,11 @@ export type PlaybackIdentifier =
       path: string;
     };
 
+export type Track = {
+  index: number;
+  durationMilliseconds: number;
+};
+
 export type Playback = (
   | {
       state: "stopped";
@@ -22,4 +27,7 @@ export type Playback = (
       durationMilliseconds: number;
       identifier: PlaybackIdentifier;
     }
-) & { positionMilliseconds: number };
+) & {
+  positionMilliseconds: number;
+  tracks: Track[];
+};

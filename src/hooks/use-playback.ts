@@ -14,6 +14,7 @@ import { Playback } from "../types/playback";
 const defaultPlayback: Playback = {
   state: "stopped",
   positionMilliseconds: 0,
+  tracks: [],
 };
 
 const globalPlayback = ref<Playback>(defaultPlayback);

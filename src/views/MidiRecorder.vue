@@ -2,13 +2,14 @@
 import { confirm } from '@tauri-apps/plugin-dialog';
 import RecorderControls from '../components/recorder/RecorderControls.vue';
 import PlaybackControls from '../components/recorder/PlaybackControls.vue';
-import Recording from '../components/recorder/Recording.vue';
 import { usePlayback } from '../hooks/use-playback';
 import { useRecorder } from '../hooks/use-recorder';
 import RecorderView from '../components/recorder/RecorderView.vue';
+import RecordingList from '../components/recorder/RecordingList.vue';
+import TrackList from '../components/recorder/TrackList.vue';
 
 const { recorder, startRecording, stopRecording, saveRecording, deleteRecording } = useRecorder();
-const { playback, playRecording, pausePlayback, resumePlayback, stopPlayback, updatePlayback, loadTrack } = usePlayback();
+const { playback, playRecording, pausePlayback, resumePlayback, stopPlayback, updatePlayback, loadTrack, playTrack } = usePlayback();
 
 function handleSaveRecording(index: number) {
     // FIXME: https://vuejs.org/examples/#modal
@@ -39,16 +40,10 @@ function handleDeleteRecording(index: number) {
             </PlaybackControls>
         </div>
         <RecorderView></RecorderView>
-        <span v-if="recorder.recordings.length === 0">No recordings yet.</span>
-        <div v-else class="flex flex-col">
-            <h1 class="mb-2">Recordings</h1>
-            <div class="flex flex-col gap-2">
-                <template v-for="recording in recorder.recordings" :key="recording.index">
-                    <Recording :recording="recording" @play="playRecording(recording.index)"
-                        @save="handleSaveRecording(recording.index)" @delete="handleDeleteRecording(recording.index)">
-                    </Recording>
-                </template>
-            </div>
+        <div class="flex flex-row gap-4">
+            <RecordingList class="flex-1/2" :recordings="recorder.recordings" @play="playRecording"
+                @save="handleSaveRecording" @delete="handleDeleteRecording"></RecordingList>
+            <TrackList class="flex-1/2" :tracks="playback.tracks" @play="playTrack"></TrackList>
         </div>
     </div>
 </template>
