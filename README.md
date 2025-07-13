@@ -2,6 +2,9 @@
 
 Transform your digital instrument experience. With midirc, a powerful Tauri and Rust desktop application, empowering you to connect, record, play back, and interact with your digital piano or any MIDI instrument. Unlock new creative possibilities and enhance your musical journey.
 
+![Main UI](docs/midirc-setup.png)
+![Connection Dialog](docs/midirc-recorder.png)
+
 ## Roadmap
 
 - [x] Setup instrument connection (input/output)
