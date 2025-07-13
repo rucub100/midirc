@@ -5,9 +5,9 @@ Transform your digital instrument experience. With midirc, a powerful Tauri and 
 ## Roadmap
 
 - [x] Setup instrument connection (input/output)
-- [ ] MIDI Recorder
-- [ ] MIDI Player (playback)
-- [ ] Save/Load Standard MIDI Files (SMF)
+- [x] WIP: MIDI Recorder
+- [x] WIP: MIDI Player (playback)
+- [x] WIP: Save/Load Standard MIDI Files (SMF)
 - [ ] Interactive Learning Mode (Real-time Feedback & Progression)
   - [ ] Built-in Lessons (e.g. chords, public domain beginner pieces)
 - [ ] MIDI Editor (edit and create interactive content)
@@ -47,3 +47,7 @@ You can learn more about Take Over mode [here](https://github.com/johnsoncodehk/
 ### Google Fonts (Icons)
 
 - [https://fonts.google.com/icons](https://fonts.google.com/icons)
+
+## License
+
+This project is licensed under the [MIT License](./LICENSE).
